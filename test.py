@@ -6,11 +6,45 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel
 from conf.catalog import Catalog, Drive, Navigation, Values
-from pydantic_to_pyarrow import get_pyarrow_schema
+
+# from pydantic_to_pyarrow import get_pyarrow_schema
+import pydantic_to_pyarrow
 import pyarrow as pa
 import lancedb
 import lance
 from parse import parse
+
+
+# NOTE: this does not require the root_type but we
+# should probably add validation of the type
+# This allows setting paths such as
+# catalog.drives[0].navigation
+# catalog.values
+# catalog.values.value1
+# NOTE: the type could be
+BasicType = str | float | int | bool
+EntryType = BaseModel | List[BaseModel] | BasicType | List[BasicType]
+
+
+def get_pyarrow_schema(t: Type) -> pa.Schema:
+    settings = pydantic_to_pyarrow.schema.Settings(
+        allow_losing_tz=False,
+        by_alias=False,
+        exclude_fields=True,
+    )
+    metadata = {}
+    # return pydantic_to_pyarrow.schema._get_pyarrow_type()
+    if issubclass(t, BaseModel):
+        print("Gettin pydantic type")
+        return pydantic_to_pyarrow.get_pyarrow_schema(t)
+    else:
+        print("Getting base type")
+        field_type = pydantic_to_pyarrow.schema._get_pyarrow_type(t, metadata, settings)
+        return pa.schema({"value": field_type})
+    # elif t in pydantic_to_pyarrow.schema.FIELD_MAP:
+    #     return pydantic_to_pyarrow.schema.FIELD_MAP[t]
+    # else:
+    #     raise RuntimeError(f"Can't convert type {t} to arrow schema")
 
 
 def process(value1: float) -> int:
@@ -154,34 +188,50 @@ def get_entry(path: str, root_type: Type[BaseModel]) -> BaseModel:
     return get_entry_with_type(type_path, type)
 
 
-# NOTE: this does not require the root_type but we
-# should probably add validation of the type
-# This allows setting paths such as
-# catalog.drives[0].navigation
-# catalog.values
-# catalog.values.value1
-# NOTE: the type could be
-BasicType = str | float | int | bool
-EntryType = BaseModel | List[BaseModel] | BasicType | List[BasicType]
-
-
 def set_entry(path: str, value: EntryType) -> bool:
     db_path = "test_db"
     type_path = TypePath.from_path(path)
     fs_path = type_path.to_fspath()
     print(f"Writing {fs_path}")
     schema = get_pyarrow_schema(type(value))
-    table = pa.Table.from_pylist([value.dict()], schema=schema)
+    print(schema)
+    field_type = type(value)
+    value_to_write = None
+    remaining = []
+    if get_origin(type) == list:
+        field_type = get_args(field_type)[0]
+        if isinstance(value, BaseModel):
+            value_to_write = [value.pop(0).dict()]
+            remaining = value
+        elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
+            value_to_write = [{"value": value}]
+        else:
+            raise RuntimeError(f"pond can not write type {type(value)}")
+    else:
+        if isinstance(value, BaseModel):
+            value_to_write = [value.dict()]
+        elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
+            print("Writing simple type that is not a list")
+            value_to_write = [{"value": value}]
+        else:
+            raise RuntimeError(f"pond can not write type {type(value)}")
+
+    table = pa.Table.from_pylist(value_to_write, schema=schema)
     ds = lance.write_dataset(
         table, f"{db_path}/{fs_path}.lance", schema=schema, mode="overwrite"
     )
+    for value in remaining:
+        table = pa.Table.from_pylist([value.dict()], schema=schema)
+        ds.insert(value)
 
 
 def test_set_entry():
     catalog = get_example_catalog()
     set_entry("catalog.values", catalog.values)
     set_entry("catalog.drives[0].navigation[0]", catalog.drives[0].navigation[0])
+    set_entry("catalog.drives[0].navigation", catalog.drives[0].navigation[0])
     set_entry("catalog.values.value1", catalog.values.value1)
+    set_entry("catalog.values.names", catalog.values.value1)
 
 
 def test_get_entry_with_type():
