@@ -9,7 +9,8 @@ import pyarrow as pa
 import lance
 import lancedb
 
-from pond import lens
+from pond import Lens
+import pond.lens
 
 
 def get_example_catalog() -> Catalog:
@@ -56,7 +57,7 @@ def test_db():
         ],
         values=Values(value1=0.5, value2=2, name="One", names=["Two", "Three"]),
     )
-    schema = lens.get_pyarrow_schema(Catalog)
+    schema = pond.lens.get_pyarrow_schema(Catalog)
     tbl = db.create_table("catalog", schema=schema, mode="overwrite")
     tbl.add([catalog.dict()])
     # tbl = db.create_table("catalog", data=[catalog], schema=schema)
@@ -73,42 +74,66 @@ def test_db():
 
 def test_set_entry():
     catalog = get_example_catalog()
-    lens.set_entry("catalog.values", catalog.values)
-    lens.set_entry("catalog.drives[0].navigation[0]", catalog.drives[0].navigation[0])
-    lens.set_entry("catalog.drives[0].navigation", catalog.drives[0].navigation[0])
-    lens.set_entry("catalog.values.value1", catalog.values.value1)
-    lens.set_entry("catalog.values.names", catalog.values.value1)
+    lens = Lens("catalog.values", Catalog)
+    lens.set(catalog.values)
+    lens = Lens("catalog.drives[0].navigation[0]", Catalog)
+    lens.set(catalog.drives[0].navigation[0])
+    lens = Lens("catalog.drives[0].navigation", Catalog)
+    lens.set(catalog.drives[0].navigation[0])
+    lens = Lens("catalog.values.value1", Catalog)
+    lens.set(catalog.values.value1)
+    lens = Lens("catalog.values.names", Catalog)
+    lens.set(catalog.values.value1)
 
 
 def test_get_entry_with_type():
-    catalog = lens.get_entry_with_type(lens.LensPath.from_path("test"), Catalog)
-    values = lens.get_entry_with_type(lens.LensPath.from_path("test.values"), Values)
-    drive0 = lens.get_entry_with_type(lens.LensPath.from_path("test.drives[0]"), Drive)
-    drive1 = lens.get_entry_with_type(lens.LensPath.from_path("test.drives[1]"), Drive)
-    navigation1 = lens.get_entry_with_type(
-        lens.LensPath.from_path("test.drives[0].navigation[0]"), Navigation
+    catalog = pond.lens.get_entry_with_type(
+        pond.lens.LensPath.from_path("test"), Catalog
+    )
+    values = pond.lens.get_entry_with_type(
+        pond.lens.LensPath.from_path("test.values"), Values
+    )
+    drive0 = pond.lens.get_entry_with_type(
+        pond.lens.LensPath.from_path("test.drives[0]"), Drive
+    )
+    drive1 = pond.lens.get_entry_with_type(
+        pond.lens.LensPath.from_path("test.drives[1]"), Drive
+    )
+    navigation1 = pond.lens.get_entry_with_type(
+        pond.lens.LensPath.from_path("test.drives[0].navigation[0]"), Navigation
     )
 
 
 def test_get_entry():
-    catalog = lens.get_entry("test", Catalog)
-    values = lens.get_entry("test.values", Catalog)
-    drive0 = lens.get_entry("test.drives[0]", Catalog)
-    drive1 = lens.get_entry("test.drives[1]", Catalog)
-    navigation1 = lens.get_entry("test.drives[0].navigation[0]", Catalog)
+    lens = Lens("test", Catalog)
+    catalog = lens.get()
+    lens = Lens("test.values", Catalog)
+    values = lens.get()
+    lens = Lens("test.drives[0]", Catalog)
+    drive0 = lens.get()
+    lens = Lens("test.drives[1]", Catalog)
+    drive1 = lens.get()
+    lens = Lens("test.drives[0].navigation[0]", Catalog)
+    navigation1 = lens.get()
 
 
 def test_get_type():
-    catalog = lens.get_tree_type(lens.LensPath.from_path("test"), Catalog)
+    catalog = pond.lens.get_tree_type(pond.lens.LensPath.from_path("test"), Catalog)
     print(catalog)
-    values = lens.get_tree_type(lens.LensPath.from_path("test.values"), Catalog)
+    values = pond.lens.get_tree_type(
+        pond.lens.LensPath.from_path("test.values"), Catalog
+    )
     print(values)
-    drive0 = lens.get_tree_type(lens.LensPath.from_path("test.drives[0]"), Catalog)
+    drive0 = pond.lens.get_tree_type(
+        pond.lens.LensPath.from_path("test.drives[0]"), Catalog
+    )
     print(drive0)
-    drive1 = lens.get_tree_type(lens.LensPath.from_path("test.drives[1]"), Catalog)
+    drive1 = pond.lens.get_tree_type(
+        pond.lens.LensPath.from_path("test.drives[1]"), Catalog
+    )
     print(drive1)
-    navigation1 = lens.get_tree_type(
-        lens.LensPath.from_path("test.drives[0].navigation[0]"), Catalog
+    navigation1 = pond.lens.get_tree_type(
+        pond.lens.LensPath.from_path("test.drives[0].navigation[0]"), Catalog
     )
     print(navigation1)
 
@@ -119,7 +144,7 @@ def get_type_of_entry(path: str) -> Type[BaseModel]:
 
 def write_dataset():
     catalog = get_example_catalog()
-    schema = lens.get_pyarrow_schema(Catalog)
+    schema = pond.lens.get_pyarrow_schema(Catalog)
 
     # def producer():
     #     yield pa.RecordBatch.from_pylist([catalog])
@@ -146,7 +171,7 @@ def test_append():
             uncertainty=[0.4, 0.5, 0.6],
         ),
     ]
-    schema = lens.get_pyarrow_schema(Catalog)
+    schema = pond.lens.get_pyarrow_schema(Catalog)
 
     data = pa.Table.from_pylist([catalog.dict()], schema=schema)
 
@@ -159,7 +184,8 @@ def test_append():
         ds.insert(data)
 
     print(ds.to_table())
-    catalog = lens.get_entry("test", Catalog)
+    lens = Lens("test", Catalog)
+    catalog = lens.get()
     print(catalog)
 
 

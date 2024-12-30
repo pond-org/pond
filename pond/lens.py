@@ -115,44 +115,46 @@ def get_entry_with_type(type_path: LensPath, type: Type[BaseModel]) -> BaseModel
     return type.parse_obj(table.to_pylist()[0]["value"])
 
 
-def get_entry(path: str, root_type: Type[BaseModel]) -> BaseModel:
-    type_path = LensPath.from_path(path)
-    type = get_tree_type(type_path, root_type)
-    return get_entry_with_type(type_path, type)
+class Lens:
+    def __init__(self, path: str, root_type: Type[BaseModel]):
+        self.lens_path = LensPath.from_path(path)
+        self.type = get_tree_type(self.lens_path, root_type)
 
+    def get(self) -> BaseModel:
+        return get_entry_with_type(self.lens_path, self.type)
 
-def set_entry(path: str, value: EntryType) -> bool:
-    db_path = "test_db"
-    type_path = LensPath.from_path(path)
-    fs_path = type_path.to_fspath()
-    print(f"Writing {fs_path}")
-    schema = get_pyarrow_schema(type(value))
-    print(schema)
-    field_type = type(value)
-    value_to_write = None
-    remaining = []
-    if get_origin(type) == list:
-        field_type = get_args(field_type)[0]
-        if isinstance(value, BaseModel):
-            value_to_write = [value.pop(0).dict()]
-            remaining = value
-        elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
-            value_to_write = [{"value": value}]
+    def set(self, value: EntryType) -> bool:
+        # TODO: check that value is of type self.type
+        db_path = "test_db"
+        fs_path = self.lens_path.to_fspath()
+        print(f"Writing {fs_path}")
+        schema = get_pyarrow_schema(type(value))
+        print(schema)
+        field_type = type(value)
+        value_to_write = None
+        remaining = []
+        if get_origin(type) == list:
+            field_type = get_args(field_type)[0]
+            if isinstance(value, BaseModel):
+                value_to_write = [value.pop(0).dict()]
+                remaining = value
+            elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
+                value_to_write = [{"value": value}]
+            else:
+                raise RuntimeError(f"pond can not write type {type(value)}")
         else:
-            raise RuntimeError(f"pond can not write type {type(value)}")
-    else:
-        if isinstance(value, BaseModel):
-            value_to_write = [value.dict()]
-        elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
-            print("Writing simple type that is not a list")
-            value_to_write = [{"value": value}]
-        else:
-            raise RuntimeError(f"pond can not write type {type(value)}")
+            if isinstance(value, BaseModel):
+                value_to_write = [value.dict()]
+            elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
+                print("Writing simple type that is not a list")
+                value_to_write = [{"value": value}]
+            else:
+                raise RuntimeError(f"pond can not write type {type(value)}")
 
-    table = pa.Table.from_pylist(value_to_write, schema=schema)
-    ds = lance.write_dataset(
-        table, f"{db_path}/{fs_path}.lance", schema=schema, mode="overwrite"
-    )
-    for value in remaining:
-        table = pa.Table.from_pylist([value.dict()], schema=schema)
-        ds.insert(value)
+        table = pa.Table.from_pylist(value_to_write, schema=schema)
+        ds = lance.write_dataset(
+            table, f"{db_path}/{fs_path}.lance", schema=schema, mode="overwrite"
+        )
+        for value in remaining:
+            table = pa.Table.from_pylist([value.dict()], schema=schema)
+            ds.insert(value)
