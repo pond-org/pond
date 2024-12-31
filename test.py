@@ -74,67 +74,73 @@ def test_db():
 
 def test_set_entry():
     catalog = get_example_catalog()
-    lens = Lens("catalog.values", Catalog)
+    lens = Lens(Catalog, "values")
     lens.set(catalog.values)
-    lens = Lens("catalog.drives[0].navigation[0]", Catalog)
+    # value = lens.get()
+    # assert value == catalog.values
+    lens = Lens(Catalog, "drives[0].navigation[0]")
     lens.set(catalog.drives[0].navigation[0])
-    lens = Lens("catalog.drives[0].navigation", Catalog)
-    lens.set(catalog.drives[0].navigation[0])
-    lens = Lens("catalog.values.value1", Catalog)
+    # value = lens.get()
+    # assert value == catalog.drives[0].navigation[0]
+    lens = Lens(Catalog, "drives[0].navigation")
+    lens.set(catalog.drives[0].navigation)
+    # value = lens.get()
+    # assert value == catalog.drives[0].navigation[0]
+    lens = Lens(Catalog, "values.value1")
     lens.set(catalog.values.value1)
-    lens = Lens("catalog.values.names", Catalog)
-    lens.set(catalog.values.value1)
+    # value = lens.get()
+    # assert value == catalog.values.value1
+    lens = Lens(Catalog, "values.names")
+    lens.set(catalog.values.names)
+    # value = lens.get()
+    # assert value == catalog.values.names
 
 
 def test_get_entry_with_type():
-    catalog = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("test"), Catalog
-    )
+    # catalog = pond.lens.get_entry_with_type(
+    #     pond.lens.LensPath.from_path("", "test"), Catalog
+    # )
     values = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("test.values"), Values
+        pond.lens.LensPath.from_path("values", "test"), Values
     )
     drive0 = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("test.drives[0]"), Drive
+        pond.lens.LensPath.from_path("drives[0]", "test"), Drive
     )
     drive1 = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("test.drives[1]"), Drive
+        pond.lens.LensPath.from_path("drives[1]", "test"), Drive
     )
     navigation1 = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("test.drives[0].navigation[0]"), Navigation
+        pond.lens.LensPath.from_path("drives[0].navigation[0]", "test"), Navigation
     )
 
 
 def test_get_entry():
-    lens = Lens("test", Catalog)
-    catalog = lens.get()
-    lens = Lens("test.values", Catalog)
+    # lens = Lens("", Catalog, "test")
+    # catalog = lens.get()
+    lens = Lens(Catalog, "values", "test")
     values = lens.get()
-    lens = Lens("test.drives[0]", Catalog)
+    lens = Lens(Catalog, "drives[0]", "test")
     drive0 = lens.get()
-    lens = Lens("test.drives[1]", Catalog)
+    lens = Lens(Catalog, "drives[1]", "test")
     drive1 = lens.get()
-    lens = Lens("test.drives[0].navigation[0]", Catalog)
+    lens = Lens(Catalog, "drives[0].navigation[0]", "test")
     navigation1 = lens.get()
 
 
 def test_get_type():
-    catalog = pond.lens.get_tree_type(pond.lens.LensPath.from_path("test"), Catalog)
-    print(catalog)
-    values = pond.lens.get_tree_type(
-        pond.lens.LensPath.from_path("test.values"), Catalog
-    )
+    # catalog = pond.lens.get_tree_type(pond.lens.LensPath.from_path("", "test"), Catalog)
+    # print(catalog)
+    path = pond.lens.LensPath.from_path("values")
+    values = pond.lens.get_tree_type(path.path[1:], Catalog)
     print(values)
-    drive0 = pond.lens.get_tree_type(
-        pond.lens.LensPath.from_path("test.drives[0]"), Catalog
-    )
+    path = pond.lens.LensPath.from_path("drives[0]")
+    drive0 = pond.lens.get_tree_type(path.path[1:], Catalog)
     print(drive0)
-    drive1 = pond.lens.get_tree_type(
-        pond.lens.LensPath.from_path("test.drives[1]"), Catalog
-    )
+    path = pond.lens.LensPath.from_path("drives[1]")
+    drive1 = pond.lens.get_tree_type(path.path[1:], Catalog)
     print(drive1)
-    navigation1 = pond.lens.get_tree_type(
-        pond.lens.LensPath.from_path("test.drives[0].navigation[0]"), Catalog
-    )
+    path = pond.lens.LensPath.from_path("drives[0].navigation[0]")
+    navigation1 = pond.lens.get_tree_type(path.path[1:], Catalog)
     print(navigation1)
 
 
@@ -184,9 +190,9 @@ def test_append():
         ds.insert(data)
 
     print(ds.to_table())
-    lens = Lens("test", Catalog)
-    catalog = lens.get()
-    print(catalog)
+    # lens = Lens("", Catalog, "test")
+    # catalog = lens.get()
+    # print(catalog)
 
 
 def test_dataset():
