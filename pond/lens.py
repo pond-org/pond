@@ -107,10 +107,12 @@ def get_entry_with_type(type_path: LensPath, type: Type[BaseModel]) -> BaseModel
         return type.parse_obj(table.to_pylist()[0])
     query = type_path.get_db_query()
     print(f"Getting {query} from {type_path.path[0].name}")
-    table = ds.to_table(columns={"value": query})
-    print(table)
-    print(type)
-    return type.parse_obj(table.to_pylist()[0]["value"])
+    if query:
+        table = ds.to_table(columns={"value": query})
+        return type.parse_obj(table.to_pylist()[0]["value"])
+    else:
+        table = ds.to_table()
+        return type.parse_obj(table.to_pylist()[0])
 
 
 class Lens:

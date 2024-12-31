@@ -97,9 +97,11 @@ def test_set_entry():
 
 
 def test_get_entry_with_type():
-    # catalog = pond.lens.get_entry_with_type(
-    #     pond.lens.LensPath.from_path("", "test"), Catalog
-    # )
+    catalog = pond.lens.get_entry_with_type(
+        pond.lens.LensPath.from_path("", "test"), Catalog
+    )
+    print("CATALOG")
+    print(catalog)
     values = pond.lens.get_entry_with_type(
         pond.lens.LensPath.from_path("values", "test"), Values
     )
@@ -115,8 +117,8 @@ def test_get_entry_with_type():
 
 
 def test_get_entry():
-    # lens = Lens("", Catalog, "test")
-    # catalog = lens.get()
+    lens = Lens(Catalog, "", "test")
+    catalog = lens.get()
     lens = Lens(Catalog, "values", "test")
     values = lens.get()
     lens = Lens(Catalog, "drives[0]", "test")
@@ -128,8 +130,9 @@ def test_get_entry():
 
 
 def test_get_type():
-    # catalog = pond.lens.get_tree_type(pond.lens.LensPath.from_path("", "test"), Catalog)
-    # print(catalog)
+    path = pond.lens.LensPath.from_path("")
+    catalog = pond.lens.get_tree_type(path.path[1:], Catalog)
+    print(catalog)
     path = pond.lens.LensPath.from_path("values")
     values = pond.lens.get_tree_type(path.path[1:], Catalog)
     print(values)
@@ -190,9 +193,9 @@ def test_append():
         ds.insert(data)
 
     print(ds.to_table())
-    # lens = Lens("", Catalog, "test")
-    # catalog = lens.get()
-    # print(catalog)
+    lens = Lens(Catalog, "", "test")
+    catalog = lens.get()
+    print(catalog)
 
 
 def test_dataset():
