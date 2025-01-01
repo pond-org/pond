@@ -76,16 +76,16 @@ def test_set_entry():
     catalog = get_example_catalog()
     lens = Lens(Catalog, "values")
     lens.set(catalog.values)
-    # value = lens.get()
-    # assert value == catalog.values
+    value = lens.get()
+    assert value == catalog.values
     lens = Lens(Catalog, "drives[0].navigation[0]")
     lens.set(catalog.drives[0].navigation[0])
-    # value = lens.get()
-    # assert value == catalog.drives[0].navigation[0]
+    value = lens.get()
+    assert value == catalog.drives[0].navigation[0]
     lens = Lens(Catalog, "drives[0].navigation")
     lens.set(catalog.drives[0].navigation)
     # value = lens.get()
-    # assert value == catalog.drives[0].navigation[0]
+    # assert value == catalog.drives[0].navigation
     lens = Lens(Catalog, "values.value1")
     lens.set(catalog.values.value1)
     # value = lens.get()
@@ -145,6 +145,18 @@ def test_get_type():
     path = pond.lens.LensPath.from_path("drives[0].navigation[0]")
     navigation1 = pond.lens.get_tree_type(path.path[1:], Catalog)
     print(navigation1)
+
+
+def test_path_and_query():
+    path = pond.lens.LensPath.from_path("")
+    print(path.path_and_query(1))
+    path = pond.lens.LensPath.from_path("values")
+    print(path.path_and_query(1))
+    path = pond.lens.LensPath.from_path("drives[0]")
+    print(path.path_and_query(1))
+    path = pond.lens.LensPath.from_path("drives[0].navigation[0]")
+    print(path.path_and_query(1))
+    print(path.path_and_query(2))
 
 
 def get_type_of_entry(path: str) -> Type[BaseModel]:
@@ -244,3 +256,4 @@ if __name__ == "__main__":
     test_get_entry()
     test_append()
     test_set_entry()
+    test_path_and_query()

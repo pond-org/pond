@@ -69,20 +69,25 @@ class LensPath:
             parts.append(TypeField(name, index))
         return LensPath(parts)
 
-    def get_db_query(self) -> str:
+    def get_db_query(self, level: int = 1) -> str:
+        assert level >= 1 and level <= len(self.path)
         parts = []
-        for i, field in enumerate(self.path[1:]):
+        for i, field in enumerate(self.path[level:]):
             parts.append(field.name if i == 0 else f"['{field.name}']")
             if field.index is not None:
                 parts.append(f"[{field.index+1}]")
         return "".join(parts)
 
-    def to_fspath(self) -> os.PathLike:
+    def to_fspath(self, level: int = 1) -> os.PathLike:
+        assert level >= 1 and level <= len(self.path)
         entries = map(
             lambda p: p.name if p.index is None else f"{p.name}[{p.index}]",
-            self.path,
+            self.path[:level],
         )
         return "/".join(entries)
+
+    def path_and_query(self, level: int = 1) -> tuple[os.PathLike, str]:
+        return self.to_fspath(level), self.get_db_query(level)
 
 
 def get_tree_type(path: list[TypeField], root_type: Type[BaseModel]) -> Type[BaseModel]:
@@ -101,12 +106,13 @@ def get_tree_type(path: list[TypeField], root_type: Type[BaseModel]) -> Type[Bas
 
 def get_entry_with_type(type_path: LensPath, type: Type[BaseModel]) -> BaseModel:
     db_path = "test_db"
-    ds = lance.dataset(f"./{db_path}/{type_path.path[0].name}.lance")
-    if not type_path.path:
-        table = ds.to_table()
-        return type.parse_obj(table.to_pylist()[0])
-    query = type_path.get_db_query()
-    print(f"Getting {query} from {type_path.path[0].name}")
+    for level in reversed(range(1, len(type_path.path) + 1)):
+        field_path, query = type_path.path_and_query(level)
+        path = f"./{db_path}/{field_path}.lance"
+        if os.path.exists(path):
+            break
+    ds = lance.dataset(path)
+    print(f"Getting {query} from {path}")
     if query:
         table = ds.to_table(columns={"value": query})
         return type.parse_obj(table.to_pylist()[0]["value"])
@@ -117,7 +123,7 @@ def get_entry_with_type(type_path: LensPath, type: Type[BaseModel]) -> BaseModel
 
 class Lens:
     def __init__(
-        self, root_type: Type[BaseModel], path: str, root_path: str = "catalog"
+        self, root_type: Type[BaseModel], path: str = "", root_path: str = "catalog"
     ):
         self.lens_path = LensPath.from_path(path, root_path)
         self.type = get_tree_type(self.lens_path.path[1:], root_type)
