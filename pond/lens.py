@@ -118,7 +118,16 @@ def get_entry_with_type(type_path: LensPath, type: Type[BaseModel]) -> BaseModel
         return type.parse_obj(table.to_pylist()[0]["value"])
     else:
         table = ds.to_table()
-        return type.parse_obj(table.to_pylist()[0])
+        if get_origin(type) == list:
+            print("LIST!")
+            print(table.to_pylist())
+            return table.to_pylist()[0]["value"]
+        elif not issubclass(type, BaseModel):
+            print("SIMPLE TYPE!")
+            print(table.to_pylist())
+            return table.to_pylist()[0]["value"]
+        else:
+            return type.parse_obj(table.to_pylist()[0])
 
 
 class Lens:

@@ -88,12 +88,12 @@ def test_set_entry():
     # assert value == catalog.drives[0].navigation
     lens = Lens(Catalog, "values.value1")
     lens.set(catalog.values.value1)
-    # value = lens.get()
-    # assert value == catalog.values.value1
+    value = lens.get()
+    assert value == catalog.values.value1
     lens = Lens(Catalog, "values.names")
     lens.set(catalog.values.names)
-    # value = lens.get()
-    # assert value == catalog.values.names
+    value = lens.get()
+    assert value == catalog.values.names
 
 
 def test_get_entry_with_type():
