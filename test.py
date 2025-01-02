@@ -84,8 +84,11 @@ def test_set_entry():
     assert value == catalog.drives[0].navigation[0]
     lens = Lens(Catalog, "drives[0].navigation")
     lens.set(catalog.drives[0].navigation)
-    # value = lens.get()
-    # assert value == catalog.drives[0].navigation
+    value = lens.get()
+    print(value)
+    print(catalog.drives[0].navigation)
+    print(catalog.drives[1].navigation)
+    assert value == catalog.drives[0].navigation
     lens = Lens(Catalog, "values.value1")
     lens.set(catalog.values.value1)
     value = lens.get()

@@ -29,7 +29,10 @@ def get_pyarrow_schema(t: Type) -> pa.Schema:
     metadata = {}
     # return pydantic_to_pyarrow.schema._get_pyarrow_type()
     print(t)
-    if get_origin(t) == list or not issubclass(t, BaseModel):
+    if get_origin(t) == list:
+        t = get_args(t)[0]
+
+    if not issubclass(t, BaseModel):
         print("Getting base type")
         field_type = pydantic_to_pyarrow.schema._get_pyarrow_type(t, metadata, settings)
         return pa.schema({"value": field_type})
@@ -114,14 +117,22 @@ def get_entry_with_type(type_path: LensPath, type: Type[BaseModel]) -> BaseModel
     ds = lance.dataset(path)
     print(f"Getting {query} from {path}")
     if query:
+        print("Table: ", ds.to_table())
         table = ds.to_table(columns={"value": query})
         return type.parse_obj(table.to_pylist()[0]["value"])
     else:
         table = ds.to_table()
+        # TODO: not that these could be treated the same way
+        # the scalar ones are just one element list, just
+        # need to assert length 1 and get the first element on return
         if get_origin(type) == list:
+            field_type = get_args(type)[0]
             print("LIST!")
             print(table.to_pylist())
-            return table.to_pylist()[0]["value"]
+            if issubclass(field_type, BaseModel):
+                return [field_type.parse_obj(t) for t in table.to_pylist()]
+            else:
+                return [t["value"] for t in table.to_pylist()]
         elif not issubclass(type, BaseModel):
             print("SIMPLE TYPE!")
             print(table.to_pylist())
@@ -143,7 +154,8 @@ class Lens:
     def set(self, value: EntryType) -> bool:
         # TODO: check that value is of type self.type
         db_path = "test_db"
-        fs_path = self.lens_path.to_fspath()
+        print("FS path: ", self.lens_path.path)
+        fs_path = self.lens_path.to_fspath(level=len(self.lens_path.path))
         print(f"Writing {fs_path} with value {value}")
         print(f"With type {type(value)}")
         print(f"Self type: {self.type}")
@@ -159,10 +171,12 @@ class Lens:
             if len(value) == 0:
                 raise RuntimeError("pond can not yet write empty lists")
             elif isinstance(value[0], BaseModel):
-                value_to_write = [value.pop(0).dict()]
-                remaining = value
+                value_to_write = [value[0].dict()]
+                remaining = value[1:]
+                # value_to_write = value
+                print("WRITING FIRST VALUE: ", value_to_write)
             elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
-                value_to_write = [{"value": value}]
+                value_to_write = [{"value": v} for v in value]
             else:
                 raise RuntimeError(f"pond can not write type {type(value)}")
         else:
@@ -174,10 +188,13 @@ class Lens:
             else:
                 raise RuntimeError(f"pond can not write type {type(value)}")
 
+        print("Writing value: ", value_to_write)
         table = pa.Table.from_pylist(value_to_write, schema=schema)
+        print("Table: ", table)
         ds = lance.write_dataset(
             table, f"{db_path}/{fs_path}.lance", schema=schema, mode="overwrite"
         )
         for value in remaining:
+            print("WRITING REMAINING VALUE: ", value)
             table = pa.Table.from_pylist([value.dict()], schema=schema)
             ds.insert(table, schema=schema)
