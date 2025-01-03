@@ -107,11 +107,14 @@ def get_tree_type(path: list[TypeField], root_type: Type[BaseModel]) -> Type[Bas
     return type
 
 
-def get_entry_with_type(type_path: LensPath, type: Type[BaseModel]) -> BaseModel:
-    db_path = "test_db"
+def get_entry_with_type(
+    type_path: LensPath,
+    type: Type[BaseModel],
+    db_path: os.PathLike = "test_db",
+) -> BaseModel:
     for level in reversed(range(1, len(type_path.path) + 1)):
         field_path, query = type_path.path_and_query(level)
-        path = f"./{db_path}/{field_path}.lance"
+        path = os.path.join(db_path, f"{field_path}.lance")
         if os.path.exists(path):
             break
     ds = lance.dataset(path)
@@ -143,17 +146,21 @@ def get_entry_with_type(type_path: LensPath, type: Type[BaseModel]) -> BaseModel
 
 class Lens:
     def __init__(
-        self, root_type: Type[BaseModel], path: str = "", root_path: str = "catalog"
+        self,
+        root_type: Type[BaseModel],
+        path: str = "",
+        root_path: str = "catalog",
+        db_path: os.PathLike = "test_db",
     ):
         self.lens_path = LensPath.from_path(path, root_path)
         self.type = get_tree_type(self.lens_path.path[1:], root_type)
+        self.db_path = db_path
 
     def get(self) -> BaseModel:
-        return get_entry_with_type(self.lens_path, self.type)
+        return get_entry_with_type(self.lens_path, self.type, self.db_path)
 
     def set(self, value: EntryType) -> bool:
         # TODO: check that value is of type self.type
-        db_path = "test_db"
         print("FS path: ", self.lens_path.path)
         fs_path = self.lens_path.to_fspath(level=len(self.lens_path.path))
         print(f"Writing {fs_path} with value {value}")
@@ -192,7 +199,10 @@ class Lens:
         table = pa.Table.from_pylist(value_to_write, schema=schema)
         print("Table: ", table)
         ds = lance.write_dataset(
-            table, f"{db_path}/{fs_path}.lance", schema=schema, mode="overwrite"
+            table,
+            os.path.join(self.db_path, f"{fs_path}.lance"),
+            schema=schema,
+            mode="overwrite",
         )
         for value in remaining:
             print("WRITING REMAINING VALUE: ", value)

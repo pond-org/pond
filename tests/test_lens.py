@@ -1,6 +1,9 @@
 # import pond
 
-from typing import Type
+import os
+
+import pytest
+
 from pydantic import BaseModel
 from conf.catalog import Catalog, Drive, Navigation, Values
 
@@ -10,10 +13,12 @@ import lance
 import lancedb
 
 from pond import Lens
+from pond.lens import TypeField
 import pond.lens
 
 
-def get_example_catalog() -> Catalog:
+@pytest.fixture
+def catalog() -> Catalog:
     catalog = Catalog(
         drives=[
             Drive(
@@ -32,6 +37,20 @@ def get_example_catalog() -> Catalog:
     return catalog
 
 
+def write_dataset(catalog, db_path):
+    schema = pond.lens.get_pyarrow_schema(Catalog)
+
+    # def producer():
+    #     yield pa.RecordBatch.from_pylist([catalog])
+    data = pa.Table.from_pylist([catalog.dict()], schema=schema)
+
+    ds = lance.write_dataset(
+        data, os.path.join(db_path, "test.lance"), schema=schema, mode="overwrite"
+    )
+    return ds
+
+
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_db():
     # with pond.Context(Catalog) as ctx:
     #     ctx.add_transform(process, "values.value1", "values.value2")
@@ -72,114 +91,114 @@ def test_db():
     print(db["catalog"].search().where("values.value2==2").to_arrow())
 
 
-def test_set_entry():
-    catalog = get_example_catalog()
-    lens = Lens(Catalog, "values")
+def test_set_entry(catalog: Catalog, tmp_path_factory):
+    path = tmp_path_factory.mktemp("db")
+    lens = Lens(Catalog, "values", db_path=path)
     lens.set(catalog.values)
     value = lens.get()
     assert value == catalog.values
-    lens = Lens(Catalog, "drives[0].navigation[0]")
+    lens = Lens(Catalog, "drives[0].navigation[0]", db_path=path)
     lens.set(catalog.drives[0].navigation[0])
     value = lens.get()
     assert value == catalog.drives[0].navigation[0]
-    lens = Lens(Catalog, "drives[0].navigation")
+    lens = Lens(Catalog, "drives[0].navigation", db_path=path)
     lens.set(catalog.drives[0].navigation)
     value = lens.get()
-    print(value)
-    print(catalog.drives[0].navigation)
-    print(catalog.drives[1].navigation)
     assert value == catalog.drives[0].navigation
-    lens = Lens(Catalog, "values.value1")
+    lens = Lens(Catalog, "values.value1", db_path=path)
     lens.set(catalog.values.value1)
     value = lens.get()
     assert value == catalog.values.value1
-    lens = Lens(Catalog, "values.names")
+    lens = Lens(Catalog, "values.names", db_path=path)
     lens.set(catalog.values.names)
     value = lens.get()
     assert value == catalog.values.names
 
 
-def test_get_entry_with_type():
-    catalog = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("", "test"), Catalog
+def test_get_entry_with_type(catalog: Catalog, tmp_path_factory):
+    path = tmp_path_factory.mktemp("db")
+    write_dataset(catalog, path)
+    read_catalog = pond.lens.get_entry_with_type(
+        pond.lens.LensPath.from_path("", "test"), Catalog, path
     )
-    print("CATALOG")
-    print(catalog)
+    assert read_catalog == catalog
     values = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("values", "test"), Values
+        pond.lens.LensPath.from_path("values", "test"), Values, path
     )
+    assert values == catalog.values
     drive0 = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("drives[0]", "test"), Drive
+        pond.lens.LensPath.from_path("drives[0]", "test"), Drive, path
     )
+    assert drive0 == catalog.drives[0]
     drive1 = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("drives[1]", "test"), Drive
+        pond.lens.LensPath.from_path("drives[1]", "test"), Drive, path
     )
-    navigation1 = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("drives[0].navigation[0]", "test"), Navigation
+    assert drive1 == catalog.drives[1]
+    navigation0 = pond.lens.get_entry_with_type(
+        pond.lens.LensPath.from_path("drives[0].navigation[0]", "test"),
+        Navigation,
+        path,
     )
+    assert navigation0 == catalog.drives[0].navigation[0]
 
 
-def test_get_entry():
-    lens = Lens(Catalog, "", "test")
-    catalog = lens.get()
-    lens = Lens(Catalog, "values", "test")
+def test_get_entry(catalog: Catalog, tmp_path_factory):
+    path = tmp_path_factory.mktemp("db")
+    write_dataset(catalog, path)
+    lens = Lens(Catalog, "", "test", db_path=path)
+    read_catalog = lens.get()
+    assert read_catalog == catalog
+    lens = Lens(Catalog, "values", "test", db_path=path)
     values = lens.get()
-    lens = Lens(Catalog, "drives[0]", "test")
+    assert values == catalog.values
+    lens = Lens(Catalog, "drives[0]", "test", db_path=path)
     drive0 = lens.get()
-    lens = Lens(Catalog, "drives[1]", "test")
+    assert drive0 == catalog.drives[0]
+    lens = Lens(Catalog, "drives[1]", "test", db_path=path)
     drive1 = lens.get()
-    lens = Lens(Catalog, "drives[0].navigation[0]", "test")
-    navigation1 = lens.get()
+    assert drive1 == catalog.drives[1]
+    lens = Lens(Catalog, "drives[0].navigation[0]", "test", db_path=path)
+    navigation0 = lens.get()
+    assert navigation0 == catalog.drives[0].navigation[0]
 
 
 def test_get_type():
     path = pond.lens.LensPath.from_path("")
     catalog = pond.lens.get_tree_type(path.path[1:], Catalog)
-    print(catalog)
+    assert catalog == Catalog
     path = pond.lens.LensPath.from_path("values")
     values = pond.lens.get_tree_type(path.path[1:], Catalog)
-    print(values)
+    assert values == Values
     path = pond.lens.LensPath.from_path("drives[0]")
     drive0 = pond.lens.get_tree_type(path.path[1:], Catalog)
-    print(drive0)
+    assert drive0 == Drive
     path = pond.lens.LensPath.from_path("drives[1]")
     drive1 = pond.lens.get_tree_type(path.path[1:], Catalog)
-    print(drive1)
+    assert drive1 == Drive
     path = pond.lens.LensPath.from_path("drives[0].navigation[0]")
-    navigation1 = pond.lens.get_tree_type(path.path[1:], Catalog)
-    print(navigation1)
+    navigation0 = pond.lens.get_tree_type(path.path[1:], Catalog)
+    assert navigation0 == Navigation
 
 
 def test_path_and_query():
     path = pond.lens.LensPath.from_path("")
+    assert path.path == [TypeField("catalog", None)]
     print(path.path_and_query(1))
     path = pond.lens.LensPath.from_path("values")
-    print(path.path_and_query(1))
+    assert path.path == [TypeField("catalog", None), TypeField("values", None)]
     path = pond.lens.LensPath.from_path("drives[0]")
-    print(path.path_and_query(1))
+    assert path.path == [TypeField("catalog", None), TypeField("drives", 0)]
     path = pond.lens.LensPath.from_path("drives[0].navigation[0]")
+    assert path.path == [
+        TypeField("catalog", None),
+        TypeField("drives", 0),
+        TypeField("navigation", 0),
+    ]
     print(path.path_and_query(1))
     print(path.path_and_query(2))
 
 
-def get_type_of_entry(path: str) -> Type[BaseModel]:
-    pass
-
-
-def write_dataset():
-    catalog = get_example_catalog()
-    schema = pond.lens.get_pyarrow_schema(Catalog)
-
-    # def producer():
-    #     yield pa.RecordBatch.from_pylist([catalog])
-    data = pa.Table.from_pylist([catalog.dict()], schema=schema)
-
-    ds = lance.write_dataset(
-        data, "test_db/test.lance", schema=schema, mode="overwrite"
-    )
-    return ds
-
-
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_append():
     values = Values(value1=0.5, value2=2, name="One", names=[])
     catalog = Catalog(drives=[], values=values)
@@ -213,6 +232,7 @@ def test_append():
     print(catalog)
 
 
+@pytest.mark.skip(reason="no way of currently testing this")
 def test_dataset():
     # with pond.Context(Catalog) as ctx:
     #     ctx.add_transform(process, "values.value1", "values.value2")
