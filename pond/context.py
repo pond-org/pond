@@ -3,7 +3,7 @@ from typing import Callable, Type, get_type_hints, Any
 
 from pydantic import BaseModel
 
-from pond.transforms import Transform
+from pond.transform import Transform
 
 
 class Context:
