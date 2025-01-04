@@ -156,6 +156,9 @@ class Lens:
         self.type = get_tree_type(self.lens_path.path[1:], root_type)
         self.db_path = db_path
 
+    def get_type(self) -> Type:
+        return self.type
+
     def get(self) -> BaseModel:
         return get_entry_with_type(self.lens_path, self.type, self.db_path)
 
