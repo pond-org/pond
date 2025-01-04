@@ -4,10 +4,8 @@ import os
 
 import pytest
 
-from pydantic import BaseModel
 from conf.catalog import Catalog, Drive, Navigation, Values
 
-# from pydantic_to_pyarrow import get_pyarrow_schema
 import pyarrow as pa
 import lance
 import lancedb
@@ -183,19 +181,21 @@ def test_get_type():
 def test_path_and_query():
     path = pond.lens.LensPath.from_path("")
     assert path.path == [TypeField("catalog", None)]
-    print(path.path_and_query(1))
+    assert path.path_and_query(1) == ("catalog", "")
     path = pond.lens.LensPath.from_path("values")
     assert path.path == [TypeField("catalog", None), TypeField("values", None)]
+    assert path.path_and_query(1) == ("catalog", "values")
     path = pond.lens.LensPath.from_path("drives[0]")
     assert path.path == [TypeField("catalog", None), TypeField("drives", 0)]
+    assert path.path_and_query(1) == ("catalog", "drives[1]")
     path = pond.lens.LensPath.from_path("drives[0].navigation[0]")
     assert path.path == [
         TypeField("catalog", None),
         TypeField("drives", 0),
         TypeField("navigation", 0),
     ]
-    print(path.path_and_query(1))
-    print(path.path_and_query(2))
+    assert path.path_and_query(1) == ("catalog", "drives[1]['navigation'][1]")
+    assert path.path_and_query(2) == ("catalog/drives[0]", "navigation[1]")
 
 
 @pytest.mark.skip(reason="no way of currently testing this")
@@ -234,41 +234,11 @@ def test_append():
 
 @pytest.mark.skip(reason="no way of currently testing this")
 def test_dataset():
-    # with pond.Context(Catalog) as ctx:
-    #     ctx.add_transform(process, "values.value1", "values.value2")
-    # Catalog.values.value1
-    # print(Catalog.values.value1)
-    # Catalog.dives[-1].clouds[-1]
-    # ctx = Context(Catalog)
-    # ctx.register_alias(BinNavigation, pd.DataFrame)
-    # ctx.add_transform(process, "values.value1", "values.value2")
-    # table = ds.to_table(
-    #     # columns={"images": "drives.0.images"}
-    #     # columns={"images": "drives.0.images"}
-    #     columns=["drives"],
-    #     # offset=0,
-    #     # limit=1,
-    #     # columns=["values.value2"],
-    #     # filter="values.value2 = 3",
-    # )
     ds = write_dataset()
 
     for batch in ds.to_batches(columns=["drives"], batch_size=1):
         print(1)
         print(batch.to_pylist())
-
-    # table = ds.to_table(filter="values.value2 = 3")
-    # print(table)
-
-    # table = ds.take(indices=[0], filter="drives[1]", columns=["drives"], limit=0)
-    # batches = ds.to_batches(
-    #     {
-    #         "drives": "drives[1]",
-    #     }
-    # )
-    # for batch in batches:
-    #     print(batch.to_table())
-    # print(ds.versions())
 
 
 if __name__ == "__main__":
