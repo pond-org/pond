@@ -3,6 +3,7 @@ import warnings
 from collections import OrderedDict
 from typing import Callable, Type, get_type_hints, get_args, Any, Tuple
 
+from pydantic import BaseModel
 from beartype.door import is_subhint
 from beartype.roar import BeartypeDoorNonpepException
 
@@ -16,17 +17,18 @@ class Transform:
     def __init__(
         self,
         fn: Callable,
+        Catalog: Type[BaseModel],
         input: list[str] | str,
         output: list[str] | str,
         db_path: os.PathLike,
     ):
         self.fn = fn
         self.input_lenses = OrderedDict(
-            (i, Lens(self.Catalog, i, db_path=db_path))
+            (i, Lens(Catalog, i, db_path=db_path))
             for i in (input if isinstance(input, list) else [input])
         )
         self.output_lenses = OrderedDict(
-            (o, Lens(self.Catalog, o, db_path=db_path))
+            (o, Lens(Catalog, o, db_path=db_path))
             for o in (output if isinstance(output, list) else [output])
         )
         types = get_type_hints(self.fn)
@@ -45,28 +47,36 @@ class Transform:
 
         # input_types = list(types.values())
 
-        for (input_name, input_type), input_lens in zip(
-            types.items(), self.input_lenses
+        for (input_name, input_type), (input_field_name, input_lens) in zip(
+            types.items(), self.input_lenses.items(), strict=True
         ):
             try:
                 type_checks = is_subhint(input_lens.get_type(), input_type)
                 assert (
                     type_checks
-                ), f"Input {input_name} of type {input_type} does not agree with catalog entry {input_lens.path} with type {input_lens.get_type()}"
+                ), f"Input {input_name} of type {input_type} does not agree with catalog entry {input_field_name} with type {input_lens.get_type()}"
+                print(f"{input_lens.get_type()} checks with {input_type}!")
             except BeartypeDoorNonpepException as m:
                 warnings.warn(str(m))
 
-        for output_type, output_lens in zip(output_types, self.output_lenses):
+        for output_type, (output_field_name, output_lens) in zip(
+            output_types, self.output_lenses.items(), strict=True
+        ):
             try:
                 type_checks = is_subhint(output_lens.get_type(), output_type)
                 assert (
                     type_checks
-                ), f"Output of type {output_type} does not agree with catalog entry {output_lens.path} with type {output_lens.get_type()}"
+                ), f"Output of type {output_type} does not agree with catalog entry {output_field_name} with type {output_lens.get_type()}"
+                print(f"{output_lens.get_type()} checks with {output_type}!")
             except BeartypeDoorNonpepException as m:
                 warnings.warn(str(m))
 
     def __call__(self) -> None:
         args = [i.get() for i in self.input_lenses.values()]
         rtns = self.fn(*args)
-        for rtn, o in zip(rtns, self.output_lenses.values()):
+        if isinstance(rtns, tuple) and len(self.output_lenses) > 1:
+            rtns_list = list(rtns)
+        else:
+            rtns_list = [rtns]
+        for rtn, o in zip(rtns_list, self.output_lenses.values()):
             o.set(rtn)

@@ -2,9 +2,11 @@ import os
 from typing import List, Type, get_args, get_origin
 from dataclasses import dataclass
 
+import datetime
+
 import lance
 from parse import parse
-from pydantic import BaseModel
+from pydantic import BaseModel, NaiveDatetime
 
 import pydantic_to_pyarrow
 import pyarrow as pa
@@ -144,6 +146,18 @@ def get_entry_with_type(
             return type.parse_obj(table.to_pylist()[0])
 
 
+FIELD_MAP = {
+    str: pa.string(),
+    bytes: pa.binary(),
+    bool: pa.bool_(),
+    float: pa.float64(),
+    int: pa.int64(),
+    datetime.date: pa.date32(),
+    NaiveDatetime: pa.timestamp("ms", tz=None),
+    datetime.time: pa.time64("us"),
+}
+
+
 class Lens:
     def __init__(
         self,
@@ -185,14 +199,16 @@ class Lens:
                 remaining = value[1:]
                 # value_to_write = value
                 print("WRITING FIRST VALUE: ", value_to_write)
-            elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
+            # elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
+            elif field_type in FIELD_MAP:
                 value_to_write = [{"value": v} for v in value]
             else:
                 raise RuntimeError(f"pond can not write type {type(value)}")
         else:
             if isinstance(value, BaseModel):
                 value_to_write = [value.dict()]
-            elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
+            # elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
+            elif field_type in FIELD_MAP:
                 print("Writing simple type that is not a list")
                 value_to_write = [{"value": value}]
             else:

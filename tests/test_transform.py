@@ -1,6 +1,7 @@
 # import pond
 
 import os
+from typing import Any
 
 import pytest
 
@@ -33,16 +34,36 @@ def value1_value2(value1: float) -> int:
     return int(value1)
 
 
+def value1_value2_not_annotated(value1: Any) -> Any:
+    return int(value1)
+
+
 def test_transform(catalog: Catalog, tmp_path_factory):
     path = tmp_path_factory.mktemp("db")
     lens = Lens(Catalog, "values.value1", db_path=path)
     lens.set(catalog.values.value1)
-    transform = Transform(value1_value2, "values.value1", "values.value2", db_path=path)
+    transform = Transform(
+        value1_value2,
+        Catalog,
+        "values.value1",
+        "values.value2",
+        db_path=path,
+    )
     transform()
     lens = Lens(Catalog, "values.value2", db_path=path)
     assert lens.get() == value1_value2(catalog.values.value1)
     transform = Transform(
-        value1_value2, ["values.value1"], ["values.value2"], db_path=path
+        value1_value2, Catalog, ["values.value1"], ["values.value2"], db_path=path
+    )
+    transform()
+    lens = Lens(Catalog, "values.value2", db_path=path)
+    assert lens.get() == value1_value2(catalog.values.value1)
+    transform = Transform(
+        value1_value2_not_annotated,
+        Catalog,
+        "values.value1",
+        "values.value2",
+        db_path=path,
     )
     transform()
     lens = Lens(Catalog, "values.value2", db_path=path)
