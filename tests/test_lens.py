@@ -113,6 +113,25 @@ def test_set_entry(catalog: Catalog, tmp_path_factory):
     assert value == catalog.values.names
 
 
+def test_set_part(catalog: Catalog, tmp_path_factory):
+    path = tmp_path_factory.mktemp("db")
+    lens = Lens(Catalog, "values", db_path=path)
+    lens.set(catalog.values)
+    lens = Lens(Catalog, "values.value1", db_path=path)
+    value = lens.get()
+    assert value == catalog.values.value1
+    lens = Lens(Catalog, "drives[0]", db_path=path)
+    lens.set(catalog.drives[0])
+    lens = Lens(Catalog, "drives[0].navigation", db_path=path)
+    value = lens.get()
+    assert value == catalog.drives[0].navigation
+    lens = Lens(Catalog, "drives[1]", db_path=path)
+    lens.set(catalog.drives[1])
+    lens = Lens(Catalog, "drives[1].images", db_path=path)
+    value = lens.get()
+    assert value == catalog.drives[1].images
+
+
 def test_get_entry_with_type(catalog: Catalog, tmp_path_factory):
     path = tmp_path_factory.mktemp("db")
     write_dataset(catalog, path)
