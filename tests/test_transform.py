@@ -91,8 +91,8 @@ def nav_list_id(input: list[Navigation]) -> list[Navigation]:
 
 def test_list(catalog: Catalog, tmp_path_factory):
     path = tmp_path_factory.mktemp("db")
-    lens = Lens(Catalog, "drives[0].navigation", db_path=path)
-    lens.set(catalog.drives[0].navigation)
+    lens = Lens(Catalog, "drives[0]", db_path=path)
+    lens.set(catalog.drives[0])
     transform = Transform(
         nav_list_id,
         Catalog,

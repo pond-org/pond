@@ -124,26 +124,35 @@ def get_entry_with_type(
     if query:
         print("Table: ", ds.to_table())
         table = ds.to_table(columns={"value": query})
-        return type.parse_obj(table.to_pylist()[0]["value"])
+        # return type.parse_obj(table.to_pylist()[0]["value"])
     else:
         table = ds.to_table()
-        # TODO: not that these could be treated the same way
-        # the scalar ones are just one element list, just
-        # need to assert length 1 and get the first element on return
-        if get_origin(type) == list:
-            field_type = get_args(type)[0]
-            print("LIST!")
-            print(table.to_pylist())
-            if issubclass(field_type, BaseModel):
-                return [field_type.parse_obj(t) for t in table.to_pylist()]
-            else:
-                return [t["value"] for t in table.to_pylist()]
-        elif not issubclass(type, BaseModel):
-            print("SIMPLE TYPE!")
-            print(table.to_pylist())
-            return table.to_pylist()[0]["value"]
+    # TODO: not that these could be treated the same way
+    # the scalar ones are just one element list, just
+    # need to assert length 1 and get the first element on return
+    if get_origin(type) == list:
+        field_type = get_args(type)[0]
+        print("LIST!")
+        print(table.to_pylist())
+        if issubclass(field_type, BaseModel):
+            return [
+                field_type.parse_obj(t)
+                for t in (table.to_pylist()[0]["value"] if query else table.to_pylist())
+            ]
         else:
-            return type.parse_obj(table.to_pylist()[0])
+            return (
+                table.to_pylist()[0]["value"]
+                if query
+                else [t["value"] for t in table.to_pylist()]
+            )
+    elif not issubclass(type, BaseModel):
+        print("SIMPLE TYPE!")
+        print(table.to_pylist())
+        return table.to_pylist()[0]["value"]
+    else:
+        return type.parse_obj(
+            table.to_pylist()[0]["value"] if query else table.to_pylist()[0]
+        )
 
 
 FIELD_MAP = {
