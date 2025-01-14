@@ -132,31 +132,31 @@ def test_set_part(catalog: Catalog, tmp_path_factory):
     assert value == catalog.drives[1].images
 
 
-def test_get_entry_with_type(catalog: Catalog, tmp_path_factory):
-    path = tmp_path_factory.mktemp("db")
-    write_dataset(catalog, path)
-    read_catalog = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("", "test"), Catalog, path
-    )
-    assert read_catalog == catalog
-    values = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("values", "test"), Values, path
-    )
-    assert values == catalog.values
-    drive0 = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("drives[0]", "test"), Drive, path
-    )
-    assert drive0 == catalog.drives[0]
-    drive1 = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("drives[1]", "test"), Drive, path
-    )
-    assert drive1 == catalog.drives[1]
-    navigation0 = pond.lens.get_entry_with_type(
-        pond.lens.LensPath.from_path("drives[0].navigation[0]", "test"),
-        Navigation,
-        path,
-    )
-    assert navigation0 == catalog.drives[0].navigation[0]
+# def test_get_entry_with_type(catalog: Catalog, tmp_path_factory):
+#     path = tmp_path_factory.mktemp("db")
+#     write_dataset(catalog, path)
+#     read_catalog = pond.lens.get_entry_with_type(
+#         pond.lens.LensPath.from_path("", "test"), Catalog, path
+#     )
+#     assert read_catalog == catalog
+#     values = pond.lens.get_entry_with_type(
+#         pond.lens.LensPath.from_path("values", "test"), Values, path
+#     )
+#     assert values == catalog.values
+#     drive0 = pond.lens.get_entry_with_type(
+#         pond.lens.LensPath.from_path("drives[0]", "test"), Drive, path
+#     )
+#     assert drive0 == catalog.drives[0]
+#     drive1 = pond.lens.get_entry_with_type(
+#         pond.lens.LensPath.from_path("drives[1]", "test"), Drive, path
+#     )
+#     assert drive1 == catalog.drives[1]
+#     navigation0 = pond.lens.get_entry_with_type(
+#         pond.lens.LensPath.from_path("drives[0].navigation[0]", "test"),
+#         Navigation,
+#         path,
+#     )
+#     assert navigation0 == catalog.drives[0].navigation[0]
 
 
 def test_get_entry(catalog: Catalog, tmp_path_factory):
@@ -263,7 +263,7 @@ def test_dataset():
 if __name__ == "__main__":
     test_dataset()
     # test_db()
-    test_get_entry_with_type()
+    # test_get_entry_with_type()
     test_get_type()
     test_get_entry()
     test_append()

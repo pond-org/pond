@@ -11,6 +11,8 @@ from pydantic import BaseModel, NaiveDatetime
 import pydantic_to_pyarrow
 import pyarrow as pa
 
+from pond.abstract_catalog import TypeField, LensPath, LanceCatalog
+
 # NOTE: this does not require the root_type but we
 # should probably add validation of the type
 # This allows setting paths such as
@@ -47,54 +49,6 @@ def get_pyarrow_schema(t: Type) -> pa.Schema:
     #     raise RuntimeError(f"Can't convert type {t} to arrow schema")
 
 
-@dataclass
-class TypeField:
-    name: str
-    index: int | None
-
-
-@dataclass
-class LensPath:
-    path: list[TypeField]
-
-    @staticmethod
-    def from_path(path: str, root_path: str = "catalog") -> "LensPath":
-        parts = [TypeField(root_path, None)]
-        if path == "":
-            return LensPath(parts)
-        components = path.split(".")
-        for i, c in enumerate(components):
-            if matches := parse("{:w}[{:d}]", c):
-                name, index = matches
-            elif matches := parse("{:w}", c):
-                name = matches[0]
-                index = None
-            else:
-                raise RuntimeError(f"Could not parse {c} as column")
-            parts.append(TypeField(name, index))
-        return LensPath(parts)
-
-    def get_db_query(self, level: int = 1) -> str:
-        assert level >= 1 and level <= len(self.path)
-        parts = []
-        for i, field in enumerate(self.path[level:]):
-            parts.append(field.name if i == 0 else f"['{field.name}']")
-            if field.index is not None:
-                parts.append(f"[{field.index+1}]")
-        return "".join(parts)
-
-    def to_fspath(self, level: int = 1) -> os.PathLike:
-        assert level >= 1 and level <= len(self.path)
-        entries = map(
-            lambda p: p.name if p.index is None else f"{p.name}[{p.index}]",
-            self.path[:level],
-        )
-        return "/".join(entries)
-
-    def path_and_query(self, level: int = 1) -> tuple[os.PathLike, str]:
-        return self.to_fspath(level), self.get_db_query(level)
-
-
 def get_tree_type(path: list[TypeField], root_type: Type[BaseModel]) -> Type[BaseModel]:
     if not path:
         return root_type
@@ -107,52 +61,6 @@ def get_tree_type(path: list[TypeField], root_type: Type[BaseModel]) -> Type[Bas
     type = get_tree_type(path, field_type) if path else field_type
     path.insert(0, field)
     return type
-
-
-def get_entry_with_type(
-    type_path: LensPath,
-    type: Type[BaseModel],
-    db_path: os.PathLike = "test_db",
-) -> BaseModel:
-    for level in reversed(range(1, len(type_path.path) + 1)):
-        field_path, query = type_path.path_and_query(level)
-        path = os.path.join(db_path, f"{field_path}.lance")
-        if os.path.exists(path):
-            break
-    ds = lance.dataset(path)
-    print(f"Getting {query} from {path}")
-    if query:
-        print("Table: ", ds.to_table())
-        table = ds.to_table(columns={"value": query})
-        # return type.parse_obj(table.to_pylist()[0]["value"])
-    else:
-        table = ds.to_table()
-    # TODO: not that these could be treated the same way
-    # the scalar ones are just one element list, just
-    # need to assert length 1 and get the first element on return
-    if get_origin(type) == list:
-        field_type = get_args(type)[0]
-        print("LIST!")
-        print(table.to_pylist())
-        if issubclass(field_type, BaseModel):
-            return [
-                field_type.parse_obj(t)
-                for t in (table.to_pylist()[0]["value"] if query else table.to_pylist())
-            ]
-        else:
-            return (
-                table.to_pylist()[0]["value"]
-                if query
-                else [t["value"] for t in table.to_pylist()]
-            )
-    elif not issubclass(type, BaseModel):
-        print("SIMPLE TYPE!")
-        print(table.to_pylist())
-        return table.to_pylist()[0]["value"]
-    else:
-        return type.parse_obj(
-            table.to_pylist()[0]["value"] if query else table.to_pylist()[0]
-        )
 
 
 FIELD_MAP = {
@@ -178,12 +86,41 @@ class Lens:
         self.lens_path = LensPath.from_path(path, root_path)
         self.type = get_tree_type(self.lens_path.path[1:], root_type)
         self.db_path = db_path
+        self.catalog = LanceCatalog(db_path)
 
     def get_type(self) -> Type:
         return self.type
 
     def get(self) -> BaseModel:
-        return get_entry_with_type(self.lens_path, self.type, self.db_path)
+        table, is_query = self.catalog.load_table(self.lens_path)
+        # TODO: not that these could be treated the same way
+        # the scalar ones are just one element list, just
+        # need to assert length 1 and get the first element on return
+        if get_origin(self.type) == list:
+            field_type = get_args(self.type)[0]
+            print("LIST!")
+            print(table.to_pylist())
+            if issubclass(field_type, BaseModel):
+                return [
+                    field_type.parse_obj(t)
+                    for t in (
+                        table.to_pylist()[0]["value"] if is_query else table.to_pylist()
+                    )
+                ]
+            else:
+                return (
+                    table.to_pylist()[0]["value"]
+                    if is_query
+                    else [t["value"] for t in table.to_pylist()]
+                )
+        elif not issubclass(self.type, BaseModel):
+            print("SIMPLE TYPE!")
+            print(table.to_pylist())
+            return table.to_pylist()[0]["value"]
+        else:
+            return self.type.parse_obj(
+                table.to_pylist()[0]["value"] if is_query else table.to_pylist()[0]
+            )
 
     def set(self, value: EntryType) -> bool:
         # TODO: check that value is of type self.type
@@ -197,16 +134,15 @@ class Lens:
         print(schema)
         field_type = self.type  # type(value)
         value_to_write = None
-        remaining = []
+        per_row = False
         if get_origin(self.type) == list:
             field_type = get_args(field_type)[0]
             print(field_type)
             if len(value) == 0:
                 raise RuntimeError("pond can not yet write empty lists")
             elif isinstance(value[0], BaseModel):
-                value_to_write = [value[0].dict()]
-                remaining = value[1:]
-                # value_to_write = value
+                value_to_write = [v.dict() for v in value]
+                per_row = True
                 print("WRITING FIRST VALUE: ", value_to_write)
             # elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
             elif field_type in FIELD_MAP:
@@ -226,13 +162,4 @@ class Lens:
         print("Writing value: ", value_to_write)
         table = pa.Table.from_pylist(value_to_write, schema=schema)
         print("Table: ", table)
-        ds = lance.write_dataset(
-            table,
-            os.path.join(self.db_path, f"{fs_path}.lance"),
-            schema=schema,
-            mode="overwrite",
-        )
-        for value in remaining:
-            print("WRITING REMAINING VALUE: ", value)
-            table = pa.Table.from_pylist([value.dict()], schema=schema)
-            ds.insert(table, schema=schema)
+        return self.catalog.write_table(table, self.lens_path, schema, per_row=per_row)
