@@ -1,11 +1,7 @@
-import os
 from typing import List, Type, get_args, get_origin
-from dataclasses import dataclass
 
 import datetime
 
-import lance
-from parse import parse
 from pydantic import BaseModel, NaiveDatetime
 
 import pydantic_to_pyarrow
@@ -15,8 +11,6 @@ from pond.abstract_catalog import (
     TypeField,
     LensPath,
     AbstractCatalog,
-    LanceCatalog,
-    IcebergCatalog,
 )
 
 # NOTE: this does not require the root_type but we

@@ -95,7 +95,7 @@ class IcebergCatalog(AbstractCatalog):
             query = path.path[level:]
             if self.catalog.table_exists(identifier):
                 break
-        iceberg_table = self.catalog.load(identifier)
+        iceberg_table = self.catalog.load_table(identifier)
         if query:
             field = ".".join(q.name for q in query)
             table = iceberg_table.scan(selected_fields=(field,)).to_arrow()

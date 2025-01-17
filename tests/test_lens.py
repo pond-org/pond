@@ -9,9 +9,10 @@ from conf.catalog import Catalog, Drive, Navigation, Values
 import pyarrow as pa
 import lance
 import lancedb
+from pyiceberg.catalog.sql import SqlCatalog
 
 from pond import Lens
-from pond.abstract_catalog import LanceCatalog
+from pond.abstract_catalog import LanceCatalog, IcebergCatalog
 from pond.lens import TypeField
 import pond.lens
 
@@ -53,6 +54,23 @@ def write_dataset(catalog, db_path):
         data, os.path.join(db_path, "test.lance"), schema=schema, mode="overwrite"
     )
     return ds
+
+
+def write_iceberg_dataset(catalog, iceberg_catalog):
+    schema = pond.lens.get_pyarrow_schema(Catalog)
+
+    data = pa.Table.from_pylist([catalog.dict()], schema=schema)
+
+    iceberg_catalog.create_namespace_if_not_exists("test")
+    iceberg_table = iceberg_catalog.create_table_if_not_exists(
+        identifier="test.catalog",
+        schema=schema,
+    )
+    iceberg_table.overwrite(df=data)
+    # ds = lance.write_dataset(
+    #     data, os.path.join(db_path, "test.lance"), schema=schema, mode="overwrite"
+    # )
+    # return ds
 
 
 @pytest.mark.skip(reason="no way of currently testing this")
@@ -172,6 +190,36 @@ def test_get_entry(catalog: Catalog, tmp_path_factory):
     path = tmp_path_factory.mktemp("db")
     data_catalog = LanceCatalog(path)
     write_dataset(catalog, path)
+    lens = Lens(Catalog, "", data_catalog, "test")  # , db_path=path)
+    read_catalog = lens.get()
+    assert read_catalog == catalog
+    lens = Lens(Catalog, "values", data_catalog, "test")  # , db_path=path)
+    values = lens.get()
+    assert values == catalog.values
+    lens = Lens(Catalog, "drives[0]", data_catalog, "test")  # , db_path=path)
+    drive0 = lens.get()
+    assert drive0 == catalog.drives[0]
+    lens = Lens(Catalog, "drives[1]", data_catalog, "test")  # , db_path=path)
+    drive1 = lens.get()
+    assert drive1 == catalog.drives[1]
+    lens = Lens(
+        Catalog, "drives[0].navigation[0]", data_catalog, "test"
+    )  # , db_path=path)
+    navigation0 = lens.get()
+    assert navigation0 == catalog.drives[0].navigation[0]
+
+
+def test_get_entry_iceberg(catalog: Catalog, tmp_path_factory):
+    warehouse_path = tmp_path_factory.mktemp("iceberg_catalog")
+    iceberg_catalog = SqlCatalog(
+        "default",
+        **{
+            "uri": f"sqlite:///{warehouse_path}/pyiceberg_catalog.db",
+            "warehouse": f"file://{warehouse_path}",
+        },
+    )
+    data_catalog = IcebergCatalog(iceberg_catalog)
+    write_iceberg_dataset(catalog, iceberg_catalog)
     lens = Lens(Catalog, "", data_catalog, "test")  # , db_path=path)
     read_catalog = lens.get()
     assert read_catalog == catalog
