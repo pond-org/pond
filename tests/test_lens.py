@@ -11,6 +11,7 @@ import lance
 import lancedb
 
 from pond import Lens
+from pond.abstract_catalog import LanceCatalog
 from pond.lens import TypeField
 import pond.lens
 
@@ -97,23 +98,24 @@ def test_db():
 
 def test_set_entry(catalog: Catalog, tmp_path_factory):
     path = tmp_path_factory.mktemp("db")
-    lens = Lens(Catalog, "values", db_path=path)
+    data_catalog = LanceCatalog(path)
+    lens = Lens(Catalog, "values", data_catalog)  # , db_path=path)
     lens.set(catalog.values)
     value = lens.get()
     assert value == catalog.values
-    lens = Lens(Catalog, "drives[0].navigation[0]", db_path=path)
+    lens = Lens(Catalog, "drives[0].navigation[0]", data_catalog)  # , db_path=path)
     lens.set(catalog.drives[0].navigation[0])
     value = lens.get()
     assert value == catalog.drives[0].navigation[0]
-    lens = Lens(Catalog, "drives[0].navigation", db_path=path)
+    lens = Lens(Catalog, "drives[0].navigation", data_catalog)  # , db_path=path)
     lens.set(catalog.drives[0].navigation)
     value = lens.get()
     assert value == catalog.drives[0].navigation
-    lens = Lens(Catalog, "values.value1", db_path=path)
+    lens = Lens(Catalog, "values.value1", data_catalog)  # , db_path=path)
     lens.set(catalog.values.value1)
     value = lens.get()
     assert value == catalog.values.value1
-    lens = Lens(Catalog, "values.names", db_path=path)
+    lens = Lens(Catalog, "values.names", data_catalog)  # , db_path=path)
     lens.set(catalog.values.names)
     value = lens.get()
     assert value == catalog.values.names
@@ -121,19 +123,20 @@ def test_set_entry(catalog: Catalog, tmp_path_factory):
 
 def test_set_part(catalog: Catalog, tmp_path_factory):
     path = tmp_path_factory.mktemp("db")
-    lens = Lens(Catalog, "values", db_path=path)
+    data_catalog = LanceCatalog(path)
+    lens = Lens(Catalog, "values", data_catalog)  # , db_path=path)
     lens.set(catalog.values)
-    lens = Lens(Catalog, "values.value1", db_path=path)
+    lens = Lens(Catalog, "values.value1", data_catalog)  # , db_path=path)
     value = lens.get()
     assert value == catalog.values.value1
-    lens = Lens(Catalog, "drives[0]", db_path=path)
+    lens = Lens(Catalog, "drives[0]", data_catalog)  # , db_path=path)
     lens.set(catalog.drives[0])
-    lens = Lens(Catalog, "drives[0].navigation", db_path=path)
+    lens = Lens(Catalog, "drives[0].navigation", data_catalog)  # , db_path=path)
     value = lens.get()
     assert value == catalog.drives[0].navigation
-    lens = Lens(Catalog, "drives[1]", db_path=path)
+    lens = Lens(Catalog, "drives[1]", data_catalog)  # , db_path=path)
     lens.set(catalog.drives[1])
-    lens = Lens(Catalog, "drives[1].images", db_path=path)
+    lens = Lens(Catalog, "drives[1].images", data_catalog)  # , db_path=path)
     value = lens.get()
     assert value == catalog.drives[1].images
 
@@ -167,20 +170,23 @@ def test_set_part(catalog: Catalog, tmp_path_factory):
 
 def test_get_entry(catalog: Catalog, tmp_path_factory):
     path = tmp_path_factory.mktemp("db")
+    data_catalog = LanceCatalog(path)
     write_dataset(catalog, path)
-    lens = Lens(Catalog, "", "test", db_path=path)
+    lens = Lens(Catalog, "", data_catalog, "test")  # , db_path=path)
     read_catalog = lens.get()
     assert read_catalog == catalog
-    lens = Lens(Catalog, "values", "test", db_path=path)
+    lens = Lens(Catalog, "values", data_catalog, "test")  # , db_path=path)
     values = lens.get()
     assert values == catalog.values
-    lens = Lens(Catalog, "drives[0]", "test", db_path=path)
+    lens = Lens(Catalog, "drives[0]", data_catalog, "test")  # , db_path=path)
     drive0 = lens.get()
     assert drive0 == catalog.drives[0]
-    lens = Lens(Catalog, "drives[1]", "test", db_path=path)
+    lens = Lens(Catalog, "drives[1]", data_catalog, "test")  # , db_path=path)
     drive1 = lens.get()
     assert drive1 == catalog.drives[1]
-    lens = Lens(Catalog, "drives[0].navigation[0]", "test", db_path=path)
+    lens = Lens(
+        Catalog, "drives[0].navigation[0]", data_catalog, "test"
+    )  # , db_path=path)
     navigation0 = lens.get()
     assert navigation0 == catalog.drives[0].navigation[0]
 

@@ -8,6 +8,7 @@ import pytest
 
 from conf.catalog import Catalog, Drive, Navigation, Values
 
+from pond.abstract_catalog import LanceCatalog
 from pond import Lens, Transform
 
 
@@ -47,33 +48,34 @@ def value1_value2_not_annotated(value1: Any) -> Any:
 
 def test_transform(catalog: Catalog, tmp_path_factory):
     path = tmp_path_factory.mktemp("db")
-    lens = Lens(Catalog, "values.value1", db_path=path)
+    data_catalog = LanceCatalog(path)
+    lens = Lens(Catalog, "values.value1", data_catalog)
     lens.set(catalog.values.value1)
     transform = Transform(
         value1_value2,
         Catalog,
         "values.value1",
         "values.value2",
-        db_path=path,
+        data_catalog,
     )
     transform()
-    lens = Lens(Catalog, "values.value2", db_path=path)
+    lens = Lens(Catalog, "values.value2", data_catalog)
     assert lens.get() == value1_value2(catalog.values.value1)
     transform = Transform(
-        value1_value2, Catalog, ["values.value1"], ["values.value2"], db_path=path
+        value1_value2, Catalog, ["values.value1"], ["values.value2"], data_catalog
     )
     transform()
-    lens = Lens(Catalog, "values.value2", db_path=path)
+    lens = Lens(Catalog, "values.value2", data_catalog)
     assert lens.get() == value1_value2(catalog.values.value1)
     transform = Transform(
         value1_value2_not_annotated,
         Catalog,
         "values.value1",
         "values.value2",
-        db_path=path,
+        data_catalog,
     )
     transform()
-    lens = Lens(Catalog, "values.value2", db_path=path)
+    lens = Lens(Catalog, "values.value2", data_catalog)
     assert lens.get() == value1_value2(catalog.values.value1)
 
 
@@ -83,11 +85,12 @@ def drive_id(input: Drive) -> Drive:
 
 def test_list_items(catalog: Catalog, tmp_path_factory):
     path = tmp_path_factory.mktemp("db")
-    lens = Lens(Catalog, "drives[0]", db_path=path)
+    data_catalog = LanceCatalog(path)
+    lens = Lens(Catalog, "drives[0]", data_catalog)
     lens.set(catalog.drives[0])
-    transform = Transform(drive_id, Catalog, "drives[0]", "drives[1]", db_path=path)
+    transform = Transform(drive_id, Catalog, "drives[0]", "drives[1]", data_catalog)
     transform()
-    lens = Lens(Catalog, "drives[1]", db_path=path)
+    lens = Lens(Catalog, "drives[1]", data_catalog)
     assert catalog.drives[0] == lens.get()
 
 
@@ -97,15 +100,16 @@ def nav_list_id(input: list[Navigation]) -> list[Navigation]:
 
 def test_list(catalog: Catalog, tmp_path_factory):
     path = tmp_path_factory.mktemp("db")
-    lens = Lens(Catalog, "drives[0]", db_path=path)
+    data_catalog = LanceCatalog(path)
+    lens = Lens(Catalog, "drives[0]", data_catalog)
     lens.set(catalog.drives[0])
     transform = Transform(
         nav_list_id,
         Catalog,
         "drives[0].navigation",
         "drives[1].navigation",
-        db_path=path,
+        data_catalog,
     )
     transform()
-    lens = Lens(Catalog, "drives[1].navigation", db_path=path)
+    lens = Lens(Catalog, "drives[1].navigation", data_catalog)
     assert catalog.drives[0].navigation == lens.get()

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from beartype.door import is_subhint
 from beartype.roar import BeartypeDoorNonpepException
 
+from pond.abstract_catalog import AbstractCatalog
 from pond.lens import Lens
 
 # from fbs_generated import Catalog as GenCatalog
@@ -20,15 +21,16 @@ class Transform:
         Catalog: Type[BaseModel],
         input: list[str] | str,
         output: list[str] | str,
-        db_path: os.PathLike,
+        # db_path: os.PathLike,
+        catalog: AbstractCatalog,
     ):
         self.fn = fn
         self.input_lenses = OrderedDict(
-            (i, Lens(Catalog, i, db_path=db_path))
+            (i, Lens(Catalog, i, catalog))  # , db_path=db_path))
             for i in (input if isinstance(input, list) else [input])
         )
         self.output_lenses = OrderedDict(
-            (o, Lens(Catalog, o, db_path=db_path))
+            (o, Lens(Catalog, o, catalog))  # , db_path=db_path))
             for o in (output if isinstance(output, list) else [output])
         )
         types = get_type_hints(self.fn)

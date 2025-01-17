@@ -11,7 +11,13 @@ from pydantic import BaseModel, NaiveDatetime
 import pydantic_to_pyarrow
 import pyarrow as pa
 
-from pond.abstract_catalog import TypeField, LensPath, LanceCatalog
+from pond.abstract_catalog import (
+    TypeField,
+    LensPath,
+    AbstractCatalog,
+    LanceCatalog,
+    IcebergCatalog,
+)
 
 # NOTE: this does not require the root_type but we
 # should probably add validation of the type
@@ -79,14 +85,16 @@ class Lens:
     def __init__(
         self,
         root_type: Type[BaseModel],
-        path: str = "",
+        path: str,
+        catalog: AbstractCatalog,
         root_path: str = "catalog",
-        db_path: os.PathLike = "test_db",
+        # db_path: os.PathLike = "test_db",
     ):
         self.lens_path = LensPath.from_path(path, root_path)
         self.type = get_tree_type(self.lens_path.path[1:], root_type)
-        self.db_path = db_path
-        self.catalog = LanceCatalog(db_path)
+        # self.db_path = db_path
+        # self.catalog = LanceCatalog(db_path)
+        self.catalog = catalog
 
     def get_type(self) -> Type:
         return self.type
