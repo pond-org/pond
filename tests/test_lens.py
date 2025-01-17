@@ -30,7 +30,13 @@ def catalog() -> Catalog:
                 uncertainty=[0.4, 0.5, 0.6],
             ),
         ],
-        values=Values(value1=0.5, value2=2, name="One", names=["Two", "Three"]),
+        values=Values(
+            value1=0.5,
+            value2=2,
+            name="One",
+            names=["Two", "Three"],
+            navigation=Navigation(dummy=True),
+        ),
     )
     return catalog
 

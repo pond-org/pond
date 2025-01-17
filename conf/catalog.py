@@ -11,6 +11,7 @@ class Values(BaseModel):
     value2: int
     name: str
     names: list[str]
+    navigation: Navigation
 
 
 class Drive(BaseModel):
