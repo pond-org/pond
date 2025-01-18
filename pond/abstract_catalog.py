@@ -88,25 +88,47 @@ class IcebergCatalog(AbstractCatalog):
         return True
 
     def load_table(self, path: LensPath) -> tuple[pa.Table | None, bool]:
-        names = [p.name for p in path.path]
-        for level in reversed(range(1, len(path.path))):
+        names = ["catalog"] + [p.name for p in path.path]
+        print("Getting ident for ", path.path)
+        for level in reversed(range(1, len(path.path) + 1)):
+            print("At level ", level)
             # namespace = ".".join(names[: level - 1])
-            identifier = ".".join(names[:level])
-            query = path.path[level:]
+            identifier = ".".join(names[: level + 1])
+            query = path.path[level:]  # if level > 1 else []
+            print(identifier, query)
             if self.catalog.table_exists(identifier):
+                print(f"{identifier} does exist!")
                 break
+            else:
+                print(f"{identifier} does not exist!")
         iceberg_table = self.catalog.load_table(identifier)
+        print("QUERY: ", query)
         if query:
+            print("DOING QUERY!")
             field = ".".join(q.name for q in query)
             table = iceberg_table.scan(selected_fields=(field,)).to_arrow()
             for q in query[:-1]:
-                table = table[q.name][0]
                 if q.index is not None:
-                    table = table[q.index]
-            table = pa.table({"value": table})
+                    print("DEBUG:")
+                    print(table)
+                    print(table.to_pylist())
+                    # table = table[q.name][0][q.index]
+                    table = table[q.name][0][q.index]
+                    print("AFTER")
+                    print(table)
+                else:
+                    table = table[q.name][0]
+            if query[-1].index is None:
+                table = pa.table({"value": table[0]})
+            else:
+                print(table[query[-1].name][0][query[-1].index])
+                # print()
+                table = pa.table({"value": [table[query[-1].name][0][query[-1].index]]})
         else:
+            print("NOT DOING QUERY!")
             table = iceberg_table.scan().to_arrow()
-        return table
+        print("Result: ", table.to_pylist())
+        return table, bool(query)
 
 
 class LanceCatalog(AbstractCatalog):

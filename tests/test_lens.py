@@ -61,9 +61,9 @@ def write_iceberg_dataset(catalog, iceberg_catalog):
 
     data = pa.Table.from_pylist([catalog.dict()], schema=schema)
 
-    iceberg_catalog.create_namespace_if_not_exists("test")
+    iceberg_catalog.create_namespace_if_not_exists("catalog")
     iceberg_table = iceberg_catalog.create_table_if_not_exists(
-        identifier="test.catalog",
+        identifier="catalog.test",
         schema=schema,
     )
     iceberg_table.overwrite(df=data)
@@ -220,23 +220,38 @@ def test_get_entry_iceberg(catalog: Catalog, tmp_path_factory):
     )
     data_catalog = IcebergCatalog(iceberg_catalog)
     write_iceberg_dataset(catalog, iceberg_catalog)
+    print(iceberg_catalog.properties)
+    print(iceberg_catalog.list_namespaces())
+    print(iceberg_catalog.list_tables("catalog"))
+    print(iceberg_catalog.load_table("catalog.test").scan().to_arrow())
     lens = Lens(Catalog, "", data_catalog, "test")  # , db_path=path)
     read_catalog = lens.get()
     assert read_catalog == catalog
+    print("WORKS: ", read_catalog)
     lens = Lens(Catalog, "values", data_catalog, "test")  # , db_path=path)
     values = lens.get()
     assert values == catalog.values
+    print("WORKS: ", values)
     lens = Lens(Catalog, "drives[0]", data_catalog, "test")  # , db_path=path)
     drive0 = lens.get()
     assert drive0 == catalog.drives[0]
+    print("WORKS: ", drive0)
     lens = Lens(Catalog, "drives[1]", data_catalog, "test")  # , db_path=path)
     drive1 = lens.get()
     assert drive1 == catalog.drives[1]
+    print("WORKS: ", drive1)
     lens = Lens(
         Catalog, "drives[0].navigation[0]", data_catalog, "test"
     )  # , db_path=path)
     navigation0 = lens.get()
     assert navigation0 == catalog.drives[0].navigation[0]
+    print("WORKS: ", navigation0)
+    lens = Lens(
+        Catalog, "drives[1].navigation[0]", data_catalog, "test"
+    )  # , db_path=path)
+    navigation1 = lens.get()
+    assert navigation0 == catalog.drives[1].navigation[0]
+    print("WORKS: ", navigation1)
 
 
 def test_get_type():
