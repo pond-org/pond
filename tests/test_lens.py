@@ -231,7 +231,17 @@ def test_get_entry_iceberg(catalog: Catalog, tmp_path_factory):
     lens = Lens(Catalog, "values", data_catalog, "test")  # , db_path=path)
     values = lens.get()
     assert values == catalog.values
-    print("WORKS: ", values)
+    print("WORKS: ", read_catalog)
+    lens = Lens(Catalog, "values.value1", data_catalog, "test")  # , db_path=path)
+    value1 = lens.get()
+    assert value1 == catalog.values.value1
+    print("WORKS: ", value1)
+    lens = Lens(
+        Catalog, "values.navigation.dummy", data_catalog, "test"
+    )  # , db_path=path)
+    dummy = lens.get()
+    assert dummy == catalog.values.navigation.dummy
+    print("WORKS: ", dummy)
     lens = Lens(Catalog, "drives[0]", data_catalog, "test")  # , db_path=path)
     drive0 = lens.get()
     assert drive0 == catalog.drives[0]
@@ -244,13 +254,25 @@ def test_get_entry_iceberg(catalog: Catalog, tmp_path_factory):
         Catalog, "drives[0].navigation[0]", data_catalog, "test"
     )  # , db_path=path)
     navigation0 = lens.get()
+    print(navigation0)
+    print(catalog.drives[0].navigation[0])
+    print("DOING ASSERT!")
     assert navigation0 == catalog.drives[0].navigation[0]
+    print("WORKS: ", navigation0)
+    lens = Lens(
+        Catalog, "drives[0].navigation[1]", data_catalog, "test"
+    )  # , db_path=path)
+    navigation0 = lens.get()
+    print(navigation0)
+    print(catalog.drives[0].navigation[1])
+    print("DOING ASSERT!")
+    assert navigation0 == catalog.drives[0].navigation[1]
     print("WORKS: ", navigation0)
     lens = Lens(
         Catalog, "drives[1].navigation[0]", data_catalog, "test"
     )  # , db_path=path)
     navigation1 = lens.get()
-    assert navigation0 == catalog.drives[1].navigation[0]
+    assert navigation1 == catalog.drives[1].navigation[0]
     print("WORKS: ", navigation1)
 
 

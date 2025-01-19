@@ -107,7 +107,9 @@ class IcebergCatalog(AbstractCatalog):
             print("DOING QUERY!")
             field = ".".join(q.name for q in query)
             table = iceberg_table.scan(selected_fields=(field,)).to_arrow()
-            for q in query[:-1]:
+            for level, q in enumerate(query[:-1]):
+                if level > 0:
+                    table = table[0]
                 if q.index is not None:
                     print("DEBUG:")
                     print(table)
@@ -117,13 +119,25 @@ class IcebergCatalog(AbstractCatalog):
                     print("AFTER")
                     print(table)
                 else:
-                    table = table[q.name][0]
-            if query[-1].index is None:
+                    table = table[q.name]
+                print(level, ",", q.name, ": ", table)
+            if query[-1].name == "dummy":
+                table = pa.table({"value": table})
+            elif query[-1].index is None:
+                print(table)
                 table = pa.table({"value": table[0]})
             else:
-                print(table[query[-1].name][0][query[-1].index])
+                print("FINAL: ", table[query[-1].name])
+                # print("BEFORE FINAL: ", table.to_pylist())
                 # print()
-                table = pa.table({"value": [table[query[-1].name][0][query[-1].index]]})
+                if query[-1].name == "navigation":
+                    table = pa.table(
+                        {"value": [table[query[-1].name][query[-1].index]]}
+                    )
+                else:
+                    table = pa.table(
+                        {"value": [table[query[-1].name][0][query[-1].index]]}
+                    )
         else:
             print("NOT DOING QUERY!")
             table = iceberg_table.scan().to_arrow()
