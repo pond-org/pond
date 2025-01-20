@@ -102,46 +102,24 @@ class IcebergCatalog(AbstractCatalog):
             else:
                 print(f"{identifier} does not exist!")
         iceberg_table = self.catalog.load_table(identifier)
-        print("QUERY: ", query)
         if query:
-            print("DOING QUERY!")
             field = ".".join(q.name for q in query)
             table = iceberg_table.scan(selected_fields=(field,)).to_arrow()
-            for level, q in enumerate(query[:-1]):
-                if level > 0:
+
+            for level, q in enumerate(query):
+                if level < len(query) - 1 or q.index is not None:
+                    table = table[q.name]
+                if not isinstance(table, pa.Scalar):
                     table = table[0]
                 if q.index is not None:
-                    print("DEBUG:")
-                    print(table)
-                    print(table.to_pylist())
-                    # table = table[q.name][0][q.index]
-                    table = table[q.name][0][q.index]
-                    print("AFTER")
-                    print(table)
-                else:
-                    table = table[q.name]
-                print(level, ",", q.name, ": ", table)
-            if query[-1].name == "dummy":
+                    table = table[q.index]
+
+            if query[-1].index is None:
                 table = pa.table({"value": table})
-            elif query[-1].index is None:
-                print(table)
-                table = pa.table({"value": table[0]})
             else:
-                print("FINAL: ", table[query[-1].name])
-                # print("BEFORE FINAL: ", table.to_pylist())
-                # print()
-                if query[-1].name == "navigation":
-                    table = pa.table(
-                        {"value": [table[query[-1].name][query[-1].index]]}
-                    )
-                else:
-                    table = pa.table(
-                        {"value": [table[query[-1].name][0][query[-1].index]]}
-                    )
+                table = pa.table({"value": [table]})
         else:
-            print("NOT DOING QUERY!")
             table = iceberg_table.scan().to_arrow()
-        print("Result: ", table.to_pylist())
         return table, bool(query)
 
 
