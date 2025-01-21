@@ -43,6 +43,33 @@ def catalog() -> Catalog:
     return catalog
 
 
+@pytest.fixture
+def filled_iceberg_catalog(catalog: Catalog, tmp_path_factory):
+    warehouse_path = tmp_path_factory.mktemp("iceberg_catalog")
+    iceberg_catalog = SqlCatalog(
+        "default",
+        **{
+            "uri": f"sqlite:///{warehouse_path}/pyiceberg_catalog.db",
+            "warehouse": f"file://{warehouse_path}",
+        },
+    )
+    data_catalog = IcebergCatalog(iceberg_catalog)
+    write_iceberg_dataset(catalog, iceberg_catalog)
+    print(iceberg_catalog.properties)
+    print(iceberg_catalog.list_namespaces())
+    print(iceberg_catalog.list_tables("catalog"))
+    print(iceberg_catalog.load_table("catalog.test").scan().to_arrow())
+    return data_catalog
+
+
+@pytest.fixture
+def filled_lance_catalog(catalog: Catalog, tmp_path_factory):
+    path = tmp_path_factory.mktemp("db")
+    data_catalog = LanceCatalog(path)
+    write_dataset(catalog, path)
+    return data_catalog
+
+
 def write_dataset(catalog, db_path):
     schema = pond.lens.get_pyarrow_schema(Catalog)
 
@@ -209,33 +236,20 @@ def test_get_entry(catalog: Catalog, tmp_path_factory):
     assert navigation0 == catalog.drives[0].navigation[0]
 
 
-def test_get_entry_iceberg(catalog: Catalog, tmp_path_factory):
-    warehouse_path = tmp_path_factory.mktemp("iceberg_catalog")
-    iceberg_catalog = SqlCatalog(
-        "default",
-        **{
-            "uri": f"sqlite:///{warehouse_path}/pyiceberg_catalog.db",
-            "warehouse": f"file://{warehouse_path}",
-        },
-    )
-    data_catalog = IcebergCatalog(iceberg_catalog)
-    write_iceberg_dataset(catalog, iceberg_catalog)
-    print(iceberg_catalog.properties)
-    print(iceberg_catalog.list_namespaces())
-    print(iceberg_catalog.list_tables("catalog"))
-    print(iceberg_catalog.load_table("catalog.test").scan().to_arrow())
+@pytest.mark.parametrize(
+    ("data_catalog_fixture",), [("filled_iceberg_catalog",), ("filled_lance_catalog",)]
+)
+def test_get_entry_iceberg(request, catalog, data_catalog_fixture):
+    data_catalog = request.getfixturevalue(data_catalog_fixture)
     lens = Lens(Catalog, "", data_catalog, "test")  # , db_path=path)
     read_catalog = lens.get()
     assert read_catalog == catalog
-    print("WORKS: ", read_catalog)
     lens = Lens(Catalog, "values", data_catalog, "test")  # , db_path=path)
     values = lens.get()
     assert values == catalog.values
-    print("WORKS: ", read_catalog)
     lens = Lens(Catalog, "values.value1", data_catalog, "test")  # , db_path=path)
     value1 = lens.get()
     assert value1 == catalog.values.value1
-    print("WORKS: ", value1)
     lens = Lens(
         Catalog, "values.navigation.dummy", data_catalog, "test"
     )  # , db_path=path)
@@ -244,45 +258,32 @@ def test_get_entry_iceberg(catalog: Catalog, tmp_path_factory):
     lens = Lens(Catalog, "values.navigation", data_catalog, "test")  # , db_path=path)
     navigation = lens.get()
     assert navigation == catalog.values.navigation
-    print("WORKS: ", navigation)
     lens = Lens(Catalog, "drives[0]", data_catalog, "test")  # , db_path=path)
     drive0 = lens.get()
     assert drive0 == catalog.drives[0]
-    print("WORKS: ", drive0)
     lens = Lens(Catalog, "drives[1]", data_catalog, "test")  # , db_path=path)
     drive1 = lens.get()
     assert drive1 == catalog.drives[1]
-    print("WORKS: ", drive1)
     lens = Lens(
         Catalog, "drives[0].navigation[0]", data_catalog, "test"
     )  # , db_path=path)
     navigation0 = lens.get()
-    print(navigation0)
-    print(catalog.drives[0].navigation[0])
-    print("DOING ASSERT!")
     assert navigation0 == catalog.drives[0].navigation[0]
-    print("WORKS: ", navigation0)
     lens = Lens(
         Catalog, "drives[0].navigation[1]", data_catalog, "test"
     )  # , db_path=path)
     navigation0 = lens.get()
-    print(navigation0)
-    print(catalog.drives[0].navigation[1])
-    print("DOING ASSERT!")
     assert navigation0 == catalog.drives[0].navigation[1]
-    print("WORKS: ", navigation0)
     lens = Lens(
         Catalog, "drives[0].navigation[1].dummy", data_catalog, "test"
     )  # , db_path=path)
     dummy1 = lens.get()
     assert dummy1 == catalog.drives[0].navigation[1].dummy
-    print("WORKS: ", navigation0)
     lens = Lens(
         Catalog, "drives[1].navigation[0]", data_catalog, "test"
     )  # , db_path=path)
     navigation1 = lens.get()
     assert navigation1 == catalog.drives[1].navigation[0]
-    print("WORKS: ", navigation1)
 
 
 def test_get_type():
