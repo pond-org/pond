@@ -63,6 +63,28 @@ def filled_iceberg_catalog(catalog: Catalog, tmp_path_factory):
 
 
 @pytest.fixture
+def empty_iceberg_catalog(catalog: Catalog, tmp_path_factory):
+    warehouse_path = tmp_path_factory.mktemp("iceberg_catalog")
+    iceberg_catalog = SqlCatalog(
+        "default",
+        **{
+            "uri": f"sqlite:///{warehouse_path}/pyiceberg_catalog.db",
+            "warehouse": f"file://{warehouse_path}",
+        },
+    )
+    iceberg_catalog.create_namespace_if_not_exists("catalog")
+    data_catalog = IcebergCatalog(iceberg_catalog)
+    return data_catalog
+
+
+@pytest.fixture
+def empty_lance_catalog(catalog: Catalog, tmp_path_factory):
+    path = tmp_path_factory.mktemp("db")
+    data_catalog = LanceCatalog(path)
+    return data_catalog
+
+
+@pytest.fixture
 def filled_lance_catalog(catalog: Catalog, tmp_path_factory):
     path = tmp_path_factory.mktemp("db")
     data_catalog = LanceCatalog(path)
@@ -144,6 +166,31 @@ def test_db():
 def test_set_entry(catalog: Catalog, tmp_path_factory):
     path = tmp_path_factory.mktemp("db")
     data_catalog = LanceCatalog(path)
+    lens = Lens(Catalog, "values", data_catalog)  # , db_path=path)
+    lens.set(catalog.values)
+    value = lens.get()
+    assert value == catalog.values
+    lens = Lens(Catalog, "drives[0].navigation[0]", data_catalog)  # , db_path=path)
+    lens.set(catalog.drives[0].navigation[0])
+    value = lens.get()
+    assert value == catalog.drives[0].navigation[0]
+    lens = Lens(Catalog, "drives[0].navigation", data_catalog)  # , db_path=path)
+    lens.set(catalog.drives[0].navigation)
+    value = lens.get()
+    assert value == catalog.drives[0].navigation
+    lens = Lens(Catalog, "values.value1", data_catalog)  # , db_path=path)
+    lens.set(catalog.values.value1)
+    value = lens.get()
+    assert value == catalog.values.value1
+    lens = Lens(Catalog, "values.names", data_catalog)  # , db_path=path)
+    lens.set(catalog.values.names)
+    value = lens.get()
+    assert value == catalog.values.names
+
+
+@pytest.mark.parametrize(("data_catalog_fixture",), [("empty_lance_catalog",)])
+def test_set_entry_iceberg(request, catalog, data_catalog_fixture):
+    data_catalog = request.getfixturevalue(data_catalog_fixture)
     lens = Lens(Catalog, "values", data_catalog)  # , db_path=path)
     lens.set(catalog.values)
     value = lens.get()
