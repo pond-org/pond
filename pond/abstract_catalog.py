@@ -72,7 +72,10 @@ class IcebergCatalog(AbstractCatalog):
     def write_table(
         self, table: pa.Table, path: LensPath, schema: pa.Schema, per_row: bool = False
     ) -> bool:
-        names = [p.name for p in path.path]
+        # names = [p.name for p in path.path]
+        names = ["catalog"] + [
+            p.name if p.index is None else f"{p.name}[{p.index}]" for p in path.path
+        ]
         namespace = ".".join(names[:-1])
         self.catalog.create_namespace_if_not_exists(namespace)
         iceberg_table = self.catalog.create_table_if_not_exists(
@@ -82,13 +85,16 @@ class IcebergCatalog(AbstractCatalog):
         if per_row:
             iceberg_table.overwrite(df=table)
         else:
-            iceberg_table.overwrite(df=table.take([0]))
-            for row in range(1, table.num_rows):
+            iceberg_table.overwrite(df=table.take([table.num_rows - 1]))
+            for row in reversed(range(0, table.num_rows - 1)):
                 iceberg_table.append(table.take([row]))
         return True
 
     def load_table(self, path: LensPath) -> tuple[pa.Table | None, bool]:
-        names = ["catalog"] + [p.name for p in path.path]
+        # names = ["catalog"] + [p.name for p in path.path]
+        names = ["catalog"] + [
+            p.name if p.index is None else f"{p.name}[{p.index}]" for p in path.path
+        ]
         print("Getting ident for ", path.path)
         for level in reversed(range(1, len(path.path) + 1)):
             print("At level ", level)
