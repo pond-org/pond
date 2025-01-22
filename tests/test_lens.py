@@ -163,9 +163,11 @@ def test_db():
     print(db["catalog"].search().where("values.value2==2").to_arrow())
 
 
-def test_set_entry(catalog: Catalog, tmp_path_factory):
-    path = tmp_path_factory.mktemp("db")
-    data_catalog = LanceCatalog(path)
+@pytest.mark.parametrize(
+    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+)
+def test_set_entry(request, catalog, data_catalog_fixture):
+    data_catalog = request.getfixturevalue(data_catalog_fixture)
     lens = Lens(Catalog, "values", data_catalog)  # , db_path=path)
     lens.set(catalog.values)
     value = lens.get()
@@ -191,33 +193,8 @@ def test_set_entry(catalog: Catalog, tmp_path_factory):
 @pytest.mark.parametrize(
     ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
 )
-def test_set_entry_iceberg(request, catalog, data_catalog_fixture):
+def test_set_part(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
-    lens = Lens(Catalog, "values", data_catalog)  # , db_path=path)
-    lens.set(catalog.values)
-    value = lens.get()
-    assert value == catalog.values
-    lens = Lens(Catalog, "drives[0].navigation[0]", data_catalog)  # , db_path=path)
-    lens.set(catalog.drives[0].navigation[0])
-    value = lens.get()
-    assert value == catalog.drives[0].navigation[0]
-    lens = Lens(Catalog, "drives[0].navigation", data_catalog)  # , db_path=path)
-    lens.set(catalog.drives[0].navigation)
-    value = lens.get()
-    assert value == catalog.drives[0].navigation
-    lens = Lens(Catalog, "values.value1", data_catalog)  # , db_path=path)
-    lens.set(catalog.values.value1)
-    value = lens.get()
-    assert value == catalog.values.value1
-    lens = Lens(Catalog, "values.names", data_catalog)  # , db_path=path)
-    lens.set(catalog.values.names)
-    value = lens.get()
-    assert value == catalog.values.names
-
-
-def test_set_part(catalog: Catalog, tmp_path_factory):
-    path = tmp_path_factory.mktemp("db")
-    data_catalog = LanceCatalog(path)
     lens = Lens(Catalog, "values", data_catalog)  # , db_path=path)
     lens.set(catalog.values)
     lens = Lens(Catalog, "values.value1", data_catalog)  # , db_path=path)
@@ -262,33 +239,10 @@ def test_set_part(catalog: Catalog, tmp_path_factory):
 #     assert navigation0 == catalog.drives[0].navigation[0]
 
 
-def test_get_entry(catalog: Catalog, tmp_path_factory):
-    path = tmp_path_factory.mktemp("db")
-    data_catalog = LanceCatalog(path)
-    write_dataset(catalog, path)
-    lens = Lens(Catalog, "", data_catalog, "test")  # , db_path=path)
-    read_catalog = lens.get()
-    assert read_catalog == catalog
-    lens = Lens(Catalog, "values", data_catalog, "test")  # , db_path=path)
-    values = lens.get()
-    assert values == catalog.values
-    lens = Lens(Catalog, "drives[0]", data_catalog, "test")  # , db_path=path)
-    drive0 = lens.get()
-    assert drive0 == catalog.drives[0]
-    lens = Lens(Catalog, "drives[1]", data_catalog, "test")  # , db_path=path)
-    drive1 = lens.get()
-    assert drive1 == catalog.drives[1]
-    lens = Lens(
-        Catalog, "drives[0].navigation[0]", data_catalog, "test"
-    )  # , db_path=path)
-    navigation0 = lens.get()
-    assert navigation0 == catalog.drives[0].navigation[0]
-
-
 @pytest.mark.parametrize(
     ("data_catalog_fixture",), [("filled_iceberg_catalog",), ("filled_lance_catalog",)]
 )
-def test_get_entry_iceberg(request, catalog, data_catalog_fixture):
+def test_get_entry(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
     lens = Lens(Catalog, "", data_catalog, "test")  # , db_path=path)
     read_catalog = lens.get()
