@@ -27,9 +27,11 @@ def value1_value2_not_annotated(value1: Any) -> Any:
     return int(value1)
 
 
-def test_transform(catalog: Catalog, tmp_path_factory):
-    path = tmp_path_factory.mktemp("db")
-    data_catalog = LanceCatalog(path)
+@pytest.mark.parametrize(
+    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+)
+def test_transform(request, catalog, data_catalog_fixture):
+    data_catalog = request.getfixturevalue(data_catalog_fixture)
     lens = Lens(Catalog, "values.value1", data_catalog)
     lens.set(catalog.values.value1)
     transform = Transform(
@@ -64,9 +66,11 @@ def drive_id(input: Drive) -> Drive:
     return input
 
 
-def test_list_items(catalog: Catalog, tmp_path_factory):
-    path = tmp_path_factory.mktemp("db")
-    data_catalog = LanceCatalog(path)
+@pytest.mark.parametrize(
+    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+)
+def test_list_items(request, catalog, data_catalog_fixture):
+    data_catalog = request.getfixturevalue(data_catalog_fixture)
     lens = Lens(Catalog, "drives[0]", data_catalog)
     lens.set(catalog.drives[0])
     transform = Transform(drive_id, Catalog, "drives[0]", "drives[1]", data_catalog)
@@ -79,9 +83,11 @@ def nav_list_id(input: list[Navigation]) -> list[Navigation]:
     return input
 
 
-def test_list(catalog: Catalog, tmp_path_factory):
-    path = tmp_path_factory.mktemp("db")
-    data_catalog = LanceCatalog(path)
+@pytest.mark.parametrize(
+    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+)
+def test_list(request, catalog, data_catalog_fixture):
+    data_catalog = request.getfixturevalue(data_catalog_fixture)
     lens = Lens(Catalog, "drives[0]", data_catalog)
     lens.set(catalog.drives[0])
     transform = Transform(
