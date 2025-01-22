@@ -6,36 +6,17 @@ from functools import partial
 
 import pytest
 
-from conf.catalog import Catalog, Drive, Navigation, Values
-
 from pond.abstract_catalog import LanceCatalog
 from pond import Lens, Transform
+from tests.test_utils import (
+    catalog,
+    filled_iceberg_catalog,
+    filled_lance_catalog,
+    empty_iceberg_catalog,
+    empty_lance_catalog,
+)
 
-
-@pytest.fixture
-def catalog() -> Catalog:
-    catalog = Catalog(
-        drives=[
-            Drive(
-                navigation=[Navigation(dummy=True), Navigation(dummy=False)],
-                images=[1.0, 2.0, 3.0],
-                uncertainty=[0.1, 0.2, 0.3],
-            ),
-            Drive(
-                navigation=[Navigation(dummy=False)],
-                images=[4.0, 5.0],
-                uncertainty=[0.4, 0.5, 0.6],
-            ),
-        ],
-        values=Values(
-            value1=0.5,
-            value2=2,
-            name="One",
-            names=["Two", "Three"],
-            navigation=Navigation(dummy=True),
-        ),
-    )
-    return catalog
+from conf.catalog import Catalog, Drive, Navigation, Values
 
 
 def value1_value2(value1: float) -> int:
