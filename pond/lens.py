@@ -3,8 +3,10 @@ from typing import List, Type, get_args, get_origin
 import datetime
 
 from pydantic import BaseModel, NaiveDatetime
+from parse import parse
 
 import pydantic_to_pyarrow
+from pydantic._internal import _generics
 import pyarrow as pa
 
 from pond.abstract_catalog import (
@@ -12,6 +14,7 @@ from pond.abstract_catalog import (
     LensPath,
     AbstractCatalog,
 )
+from pond.field import File
 
 # NOTE: this does not require the root_type but we
 # should probably add validation of the type
@@ -84,6 +87,10 @@ class Lens:
         root_path: str = "catalog",
         # db_path: os.PathLike = "test_db",
     ):
+        if matches := parse("{:l}:{}", path):
+            self.variant, path = matches
+        else:
+            self.variant = "default"
         self.lens_path = LensPath.from_path(path, root_path)
         self.type = get_tree_type(self.lens_path.path[1:], root_type)
         # self.db_path = db_path
@@ -91,7 +98,14 @@ class Lens:
         self.catalog = catalog
 
     def get_type(self) -> Type:
-        return self.type
+        if self.variant == "default":
+            return self.type
+        elif self.variant == "file":
+            assert issubclass(self.type, File)
+            return _generics.get_args(self.type)[0]
+        elif self.variant == "table":
+            return pa.Table
+        raise RuntimeError(f"pond does not support lens variant {self.variant}")
 
     def get(self) -> BaseModel:
         table, is_query = self.catalog.load_table(self.lens_path)
@@ -103,12 +117,25 @@ class Lens:
             print("LIST!")
             print(table.to_pylist())
             if issubclass(field_type, BaseModel):
-                return [
-                    field_type.parse_obj(t)
-                    for t in (
-                        table.to_pylist()[0]["value"] if is_query else table.to_pylist()
+                sub_table = table["value"] if is_query else table
+                if self.variant == "default":
+                    ts = sub_table.to_pylist()
+                    if is_query:
+                        ts = ts[0]
+                    return [field_type.parse_obj(t) for t in ts]
+                elif self.variant == "file":
+                    assert issubclass(self.type, File)
+                    ts = sub_table.to_pylist()
+                    if is_query:
+                        ts = ts[0]
+                    objs = [field_type.parse_obj(t) for t in ts]
+                    return [obj.load() for obj in objs]
+                elif self.varaint == "table":
+                    return sub_table
+                else:
+                    raise RuntimeError(
+                        f"pond does not support lens variant {self.variant}"
                     )
-                ]
             else:
                 return (
                     table.to_pylist()[0]["value"]
@@ -120,9 +147,17 @@ class Lens:
             print(table.to_pylist())
             return table.to_pylist()[0]["value"]
         else:
-            return self.type.parse_obj(
-                table.to_pylist()[0]["value"] if is_query else table.to_pylist()[0]
-            )
+            sub_table = table["value"] if is_query else table
+            if self.variant == "default":
+                return self.type.parse_obj(sub_table.to_pylist()[0])
+            elif self.variant == "file":
+                assert issubclass(self.type, File)
+                obj = self.type.parse_obj(sub_table.to_pylist()[0])
+                return obj.load()
+            elif self.varaint == "table":
+                return sub_table
+            else:
+                raise RuntimeError(f"pond does not support lens variant {self.variant}")
 
     def set(self, value: EntryType) -> bool:
         # TODO: check that value is of type self.type

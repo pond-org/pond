@@ -74,6 +74,10 @@ def test_set_entry(request, catalog, data_catalog_fixture):
     lens.set(catalog.drives[0].navigation[0])
     value = lens.get()
     assert value == catalog.drives[0].navigation[0]
+    lens = Lens(Catalog, "drives", data_catalog)  # , db_path=path)
+    lens.set(catalog.drives)
+    value = lens.get()
+    assert value == catalog.drives
     lens = Lens(Catalog, "drives[0].navigation", data_catalog)  # , db_path=path)
     lens.set(catalog.drives[0].navigation)
     value = lens.get()
@@ -159,6 +163,9 @@ def test_get_entry(request, catalog, data_catalog_fixture):
     lens = Lens(Catalog, "values.navigation", data_catalog, "test")  # , db_path=path)
     navigation = lens.get()
     assert navigation == catalog.values.navigation
+    lens = Lens(Catalog, "drives", data_catalog, "test")  # , db_path=path)
+    drives = lens.get()
+    assert drives == catalog.drives
     lens = Lens(Catalog, "drives[0]", data_catalog, "test")  # , db_path=path)
     drive0 = lens.get()
     assert drive0 == catalog.drives[0]
