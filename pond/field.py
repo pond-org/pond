@@ -1,18 +1,30 @@
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, Callable
 
 import pydantic
+from pydantic import BaseModel, ConfigDict
 
 
 DataT = TypeVar("DataT")
 
 
-class File(pydantic.BaseModel, Generic[DataT]):
+class File(BaseModel, Generic[DataT]):
+    # This is needed in order to store the "loader"
+    model_config = ConfigDict(extra="allow")
     path: str
 
+    @staticmethod
+    def save(path: str, loader: Callable[[], DataT]) -> "File[DataT]":
+        return File(path=path, loader=loader)
+
+    @staticmethod
+    def set(object: DataT) -> "File[DataT]":
+        return File(path="", object=object)
+
+    def get(self) -> DataT:
+        return self.object
+
     def load(self) -> DataT:
-        if "reader" not in self.json_schema_extra:
-            raise RuntimeError("Can't read file without reader")
-        return self.json_schema_extra["reader"](self.path)
+        return self.loader()
 
 
 def Field(*args, reader=None, writer=None, json_schema_extra={}, **kwargs):

@@ -1,4 +1,4 @@
-from typing import List, Type, get_args, get_origin
+from typing import List, Type, Any, get_args, get_origin
 
 import datetime
 
@@ -15,6 +15,8 @@ from pond.abstract_catalog import (
     AbstractCatalog,
 )
 from pond.field import File
+
+from fsspec.implementations.local import LocalFileSystem
 
 # NOTE: this does not require the root_type but we
 # should probably add validation of the type
@@ -52,18 +54,23 @@ def get_pyarrow_schema(t: Type) -> pa.Schema:
     #     raise RuntimeError(f"Can't convert type {t} to arrow schema")
 
 
-def get_tree_type(path: list[TypeField], root_type: Type[BaseModel]) -> Type[BaseModel]:
+def get_tree_type(
+    path: list[TypeField], root_type: Type[BaseModel]
+) -> tuple[Type[BaseModel], dict]:
     if not path:
-        return root_type
+        return root_type, {}
     field = path.pop(0)
     field_type = root_type.model_fields[field.name].annotation
+    extra_args = root_type.model_fields[field.name].json_schema_extra
     if field.index is not None:
         print(field_type)
         assert get_origin(field_type) is list
         field_type = get_args(field_type)[0]
-    type = get_tree_type(path, field_type) if path else field_type
+    type, extra_args = (
+        get_tree_type(path, field_type) if path else (field_type, extra_args)
+    )
     path.insert(0, field)
-    return type
+    return type, extra_args
 
 
 FIELD_MAP = {
@@ -92,10 +99,12 @@ class Lens:
         else:
             self.variant = "default"
         self.lens_path = LensPath.from_path(path, root_path)
-        self.type = get_tree_type(self.lens_path.path[1:], root_type)
+        self.type, self.extra_args = get_tree_type(self.lens_path.path[1:], root_type)
         # self.db_path = db_path
         # self.catalog = LanceCatalog(db_path)
         self.catalog = catalog
+        self.storage_path = "data"
+        self.fs = LocalFileSystem()
 
     def get_type(self) -> Type:
         if self.variant == "default":
@@ -107,29 +116,34 @@ class Lens:
             return pa.Table
         raise RuntimeError(f"pond does not support lens variant {self.variant}")
 
+    def get_file_paths(self, model: Any, extra_args: dict):
+        if isinstance(model, File):
+            reader = extra_args["reader"]
+            model.object = reader(model.path)
+        elif isinstance(model, list):
+            for i, value in enumerate(model):
+                self.get_file_paths(value, extra_args)
+        elif isinstance(model, BaseModel):
+            for field, value in model:
+                self.get_file_paths(value, extra_args)
+
     def get(self) -> BaseModel:
         table, is_query = self.catalog.load_table(self.lens_path)
         # TODO: not that these could be treated the same way
         # the scalar ones are just one element list, just
         # need to assert length 1 and get the first element on return
+        rtn: None | list[BaseModel] | BaseModel = None
         if get_origin(self.type) == list:
             field_type = get_args(self.type)[0]
             print("LIST!")
             print(table.to_pylist())
             if issubclass(field_type, BaseModel):
                 sub_table = table["value"] if is_query else table
-                if self.variant == "default":
+                if self.variant == "default" or self.variant == "file":
                     ts = sub_table.to_pylist()
                     if is_query:
                         ts = ts[0]
-                    return [field_type.parse_obj(t) for t in ts]
-                elif self.variant == "file":
-                    assert issubclass(self.type, File)
-                    ts = sub_table.to_pylist()
-                    if is_query:
-                        ts = ts[0]
-                    objs = [field_type.parse_obj(t) for t in ts]
-                    return [obj.load() for obj in objs]
+                    rtn = [field_type.parse_obj(t) for t in ts]
                 elif self.varaint == "table":
                     return sub_table
                 else:
@@ -145,24 +159,37 @@ class Lens:
         elif not issubclass(self.type, BaseModel):
             print("SIMPLE TYPE!")
             print(table.to_pylist())
-            return table.to_pylist()[0]["value"]
+            rtn = table.to_pylist()[0]["value"]
         else:
             sub_table = table["value"] if is_query else table
-            if self.variant == "default":
-                return self.type.parse_obj(sub_table.to_pylist()[0])
-            elif self.variant == "file":
-                assert issubclass(self.type, File)
-                obj = self.type.parse_obj(sub_table.to_pylist()[0])
-                return obj.load()
+            if self.variant == "default" or self.variant == "file":
+                rtn = self.type.parse_obj(sub_table.to_pylist()[0])
             elif self.varaint == "table":
                 return sub_table
             else:
                 raise RuntimeError(f"pond does not support lens variant {self.variant}")
 
+        assert rtn is not None
+        self.get_file_paths(rtn, self.extra_args)
+        return rtn
+
+    def set_file_paths(self, path: str, model: Any, extra_args: dict):
+        if isinstance(model, File):
+            model.path = path
+            writer = extra_args["writer"]
+            writer(model.get())
+        elif isinstance(model, list):
+            for i, value in enumerate(model):
+                self.set_file_paths(f"{path}/{i}", value, extra_args)
+        elif isinstance(model, BaseModel):
+            for field, value in model:
+                self.set_file_paths(f"{path}/{field}", value, extra_args)
+
     def set(self, value: EntryType) -> bool:
         # TODO: check that value is of type self.type
         print("FS path: ", self.lens_path.path)
         fs_path = self.lens_path.to_fspath(level=len(self.lens_path.path))
+        self.set_file_paths(self.lens_path.to_volume_path(), value, self.extra_args)
         print(f"Writing {fs_path} with value {value}")
         print(f"With type {type(value)}")
         print(f"Self type: {self.type}")
@@ -172,6 +199,7 @@ class Lens:
         field_type = self.type  # type(value)
         value_to_write = None
         per_row = False
+        # TODO: this should be a recursive function instead
         if get_origin(self.type) == list:
             field_type = get_args(field_type)[0]
             print(field_type)
@@ -186,15 +214,16 @@ class Lens:
                 value_to_write = [{"value": v} for v in value]
             else:
                 raise RuntimeError(f"pond can not write type {type(value)}")
+        # elif issubclass(self.type, File):
+        #     if self.variant == "file":
+        elif isinstance(value, BaseModel):
+            value_to_write = [value.dict()]
+        # elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
+        elif field_type in FIELD_MAP:
+            print("Writing simple type that is not a list")
+            value_to_write = [{"value": value}]
         else:
-            if isinstance(value, BaseModel):
-                value_to_write = [value.dict()]
-            # elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
-            elif field_type in FIELD_MAP:
-                print("Writing simple type that is not a list")
-                value_to_write = [{"value": value}]
-            else:
-                raise RuntimeError(f"pond can not write type {type(value)}")
+            raise RuntimeError(f"pond can not write type {type(value)}")
 
         print("Writing value: ", value_to_write)
         table = pa.Table.from_pylist(value_to_write, schema=schema)

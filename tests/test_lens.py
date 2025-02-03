@@ -196,19 +196,19 @@ def test_get_entry(request, catalog, data_catalog_fixture):
 
 def test_get_type():
     path = pond.lens.LensPath.from_path("")
-    catalog = pond.lens.get_tree_type(path.path[1:], Catalog)
+    catalog, _ = pond.lens.get_tree_type(path.path[1:], Catalog)
     assert catalog == Catalog
     path = pond.lens.LensPath.from_path("values")
-    values = pond.lens.get_tree_type(path.path[1:], Catalog)
+    values, _ = pond.lens.get_tree_type(path.path[1:], Catalog)
     assert values == Values
     path = pond.lens.LensPath.from_path("drives[0]")
-    drive0 = pond.lens.get_tree_type(path.path[1:], Catalog)
+    drive0, _ = pond.lens.get_tree_type(path.path[1:], Catalog)
     assert drive0 == Drive
     path = pond.lens.LensPath.from_path("drives[1]")
-    drive1 = pond.lens.get_tree_type(path.path[1:], Catalog)
+    drive1, _ = pond.lens.get_tree_type(path.path[1:], Catalog)
     assert drive1 == Drive
     path = pond.lens.LensPath.from_path("drives[0].navigation[0]")
-    navigation0 = pond.lens.get_tree_type(path.path[1:], Catalog)
+    navigation0, _ = pond.lens.get_tree_type(path.path[1:], Catalog)
     assert navigation0 == Navigation
 
 

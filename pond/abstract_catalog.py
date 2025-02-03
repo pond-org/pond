@@ -53,6 +53,13 @@ class LensPath:
         )
         return "/".join(entries)
 
+    def to_volume_path(self) -> os.PathLike:
+        entries = map(
+            lambda p: p.name if p.index is None else f"{p.name}/{p.index}",
+            self.path,
+        )
+        return "/".join(entries)
+
     def path_and_query(self, level: int = 1) -> tuple[os.PathLike, str]:
         return self.to_fspath(level), self.get_db_query(level)
 
