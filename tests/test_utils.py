@@ -57,7 +57,7 @@ def filled_iceberg_catalog(catalog: Catalog, tmp_path_factory):
 
 
 @pytest.fixture
-def empty_iceberg_catalog(catalog: Catalog, tmp_path_factory):
+def empty_iceberg_catalog(catalog, tmp_path_factory):
     warehouse_path = tmp_path_factory.mktemp("iceberg_catalog")
     iceberg_catalog = SqlCatalog(
         "default",
@@ -72,7 +72,7 @@ def empty_iceberg_catalog(catalog: Catalog, tmp_path_factory):
 
 
 @pytest.fixture
-def empty_lance_catalog(catalog: Catalog, tmp_path_factory):
+def empty_lance_catalog(catalog, tmp_path_factory):
     path = tmp_path_factory.mktemp("db")
     data_catalog = LanceCatalog(path)
     return data_catalog

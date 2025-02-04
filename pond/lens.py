@@ -92,6 +92,7 @@ class Lens:
         path: str,
         catalog: AbstractCatalog,
         root_path: str = "catalog",
+        storage_path: str = ".",
         # db_path: os.PathLike = "test_db",
     ):
         if matches := parse("{:l}:{}", path):
@@ -103,8 +104,8 @@ class Lens:
         # self.db_path = db_path
         # self.catalog = LanceCatalog(db_path)
         self.catalog = catalog
-        self.storage_path = "data"
-        self.fs = LocalFileSystem()
+        self.storage_path = storage_path
+        self.fs = LocalFileSystem(auto_mkdir=True)
 
     def get_type(self) -> Type:
         if self.variant == "default":
@@ -119,7 +120,7 @@ class Lens:
     def get_file_paths(self, model: Any, extra_args: dict):
         if isinstance(model, File):
             reader = extra_args["reader"]
-            model.object = reader(model.path)
+            model.object = reader(self.fs, f"{self.storage_path}/{model.path}")
         elif isinstance(model, list):
             for i, value in enumerate(model):
                 self.get_file_paths(value, extra_args)
@@ -177,7 +178,7 @@ class Lens:
         if isinstance(model, File):
             model.path = path
             writer = extra_args["writer"]
-            writer(model.get())
+            writer(model.get(), self.fs, f"{self.storage_path}/{path}")
         elif isinstance(model, list):
             for i, value in enumerate(model):
                 self.set_file_paths(f"{path}/{i}", value, extra_args)
