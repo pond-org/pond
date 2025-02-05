@@ -51,6 +51,7 @@ def test_set_file_entry(request, catalog, tmp_path_factory, data_catalog_fixture
     lens = Lens(FileCatalog, "image", data_catalog, root_path, storage_path)
     lens.set(catalog.image)
     value = lens.get()
+    assert value.path == "catalog/image"
     src = catalog.image.get()
     target = value.get()
     assert (
@@ -64,16 +65,18 @@ def test_set_file_entry(request, catalog, tmp_path_factory, data_catalog_fixture
     lens = Lens(FileCatalog, "values", data_catalog, root_path, storage_path)
     lens.set(catalog.values)
     value = lens.get()
-    assert value == catalog.values
+    assert value.path == "catalog/values"
+    assert value.get() == catalog.values.get()
     storage_path = tmp_path_factory.mktemp("storage4")
     lens = Lens(
         FileCatalog, "drives[0].navigation", data_catalog, root_path, storage_path
     )
     lens.set(catalog.drives[0].navigation)
     value = lens.get()
-    assert value == catalog.drives[0].navigation
-    # storage_path = tmp_path_factory.mktemp("storage3")
-    # lens = Lens(FileCatalog, "drives", data_catalog, root_path, storage_path)
-    # lens.set(catalog.drives)
-    # value = lens.get()
-    # assert value == catalog.drives
+    assert value.path == "catalog/drives/0/navigation"
+    assert value.get() == catalog.drives[0].navigation.get()
+    storage_path = tmp_path_factory.mktemp("storage3")
+    lens = Lens(FileCatalog, "drives", data_catalog, root_path, storage_path)
+    lens.set(catalog.drives)
+    value = lens.get()
+    assert value == catalog.drives

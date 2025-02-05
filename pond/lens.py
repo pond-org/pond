@@ -62,6 +62,7 @@ def get_tree_type(
     field = path.pop(0)
     field_type = root_type.model_fields[field.name].annotation
     extra_args = root_type.model_fields[field.name].json_schema_extra
+    print("Root extra args: ", extra_args)
     if field.index is not None:
         print(field_type)
         assert get_origin(field_type) is list
@@ -126,6 +127,7 @@ class Lens:
                 self.get_file_paths(value, extra_args)
         elif isinstance(model, BaseModel):
             for field, value in model:
+                extra_args = model.model_fields[field].json_schema_extra
                 self.get_file_paths(value, extra_args)
 
     def get(self) -> BaseModel:
@@ -184,12 +186,15 @@ class Lens:
                 self.set_file_paths(f"{path}/{i}", value, extra_args)
         elif isinstance(model, BaseModel):
             for field, value in model:
+                extra_args = model.model_fields[field].json_schema_extra
+                print(f"Trying to set {path}/{field} with extra args {extra_args}")
                 self.set_file_paths(f"{path}/{field}", value, extra_args)
 
     def set(self, value: EntryType) -> bool:
         # TODO: check that value is of type self.type
         print("FS path: ", self.lens_path.path)
         fs_path = self.lens_path.to_fspath(level=len(self.lens_path.path))
+        print("Extra args: ", self.extra_args)
         self.set_file_paths(self.lens_path.to_volume_path(), value, self.extra_args)
         print(f"Writing {fs_path} with value {value}")
         print(f"With type {type(value)}")
