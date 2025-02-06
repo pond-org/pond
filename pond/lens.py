@@ -147,7 +147,7 @@ class Lens:
                     if is_query:
                         ts = ts[0]
                     rtn = [field_type.parse_obj(t) for t in ts]
-                elif self.varaint == "table":
+                elif self.variant == "table":
                     return sub_table
                 else:
                     raise RuntimeError(
@@ -167,13 +167,27 @@ class Lens:
             sub_table = table["value"] if is_query else table
             if self.variant == "default" or self.variant == "file":
                 rtn = self.type.parse_obj(sub_table.to_pylist()[0])
-            elif self.varaint == "table":
+            elif self.variant == "table":
                 return sub_table
             else:
                 raise RuntimeError(f"pond does not support lens variant {self.variant}")
 
         assert rtn is not None
         self.get_file_paths(rtn, self.extra_args)
+
+        if self.variant == "file":
+            if isinstance(rtn, File):
+                return rtn.get()
+            elif isinstance(rtn, list):
+                if len(rtn) == 0:
+                    return []
+                assert isinstance(
+                    rtn[0], File
+                ), "pond requires file variant to have type File"
+                return [r.get() for r in rtn]
+            else:
+                raise RuntimeError("pond requires file variant to have type File")
+
         return rtn
 
     def set_file_paths(self, path: str, model: Any, extra_args: dict):
@@ -195,7 +209,6 @@ class Lens:
         print("FS path: ", self.lens_path.path)
         fs_path = self.lens_path.to_fspath(level=len(self.lens_path.path))
         print("Extra args: ", self.extra_args)
-        self.set_file_paths(self.lens_path.to_volume_path(), value, self.extra_args)
         print(f"Writing {fs_path} with value {value}")
         print(f"With type {type(value)}")
         print(f"Self type: {self.type}")
@@ -205,6 +218,25 @@ class Lens:
         field_type = self.type  # type(value)
         value_to_write = None
         per_row = False
+
+        if self.variant == "file":
+            if self.type is File:
+                value = File.set(value)
+            elif self.type is list and get_args(self.type)[0] is File:
+                value = [File.set(v) for v in value]
+            else:
+                raise RuntimeError("pond requires file variant to have type File")
+        elif self.variant == "table":
+            assert isinstance(
+                value, pa.Table
+            ), "pond requires table variant to use a pyarrow table"
+            return self.catalog.write_table(
+                value, self.lens_path, schema, per_row=per_row
+            )
+
+        # NOTE: table does not handle files
+        self.set_file_paths(self.lens_path.to_volume_path(), value, self.extra_args)
+
         # TODO: this should be a recursive function instead
         if get_origin(self.type) == list:
             field_type = get_args(field_type)[0]
