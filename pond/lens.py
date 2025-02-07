@@ -176,14 +176,12 @@ class Lens:
         self.get_file_paths(rtn, self.extra_args)
 
         if self.variant == "file":
-            if isinstance(rtn, File):
+            if _generics.get_origin(self.type) == File:
                 return rtn.get()
-            elif isinstance(rtn, list):
-                if len(rtn) == 0:
-                    return []
-                assert isinstance(
-                    rtn[0], File
-                ), "pond requires file variant to have type File"
+            elif (
+                get_origin(self.type) == list
+                and _generics.get_origin(get_args(self.type)[0]) == File
+            ):
                 return [r.get() for r in rtn]
             else:
                 raise RuntimeError("pond requires file variant to have type File")
@@ -220,9 +218,12 @@ class Lens:
         per_row = False
 
         if self.variant == "file":
-            if self.type is File:
+            if _generics.get_origin(self.type) == File:
                 value = File.set(value)
-            elif self.type is list and get_args(self.type)[0] is File:
+            elif (
+                get_origin(self.type) == list
+                and _generics.get_origin(get_args(self.type)[0]) == File
+            ):
                 value = [File.set(v) for v in value]
             else:
                 raise RuntimeError("pond requires file variant to have type File")
