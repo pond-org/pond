@@ -91,7 +91,7 @@ def write_dataset(catalog, db_path):
 
     # def producer():
     #     yield pa.RecordBatch.from_pylist([catalog])
-    data = pa.Table.from_pylist([catalog.dict()], schema=schema)
+    data = pa.Table.from_pylist([catalog.model_dump()], schema=schema)
 
     ds = lance.write_dataset(
         data, os.path.join(db_path, "test.lance"), schema=schema, mode="overwrite"
@@ -102,7 +102,7 @@ def write_dataset(catalog, db_path):
 def write_iceberg_dataset(catalog, iceberg_catalog):
     schema = pond.lens.get_pyarrow_schema(Catalog)
 
-    data = pa.Table.from_pylist([catalog.dict()], schema=schema)
+    data = pa.Table.from_pylist([catalog.model_dump()], schema=schema)
 
     iceberg_catalog.create_namespace_if_not_exists("catalog")
     iceberg_table = iceberg_catalog.create_table_if_not_exists(

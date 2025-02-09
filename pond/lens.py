@@ -146,7 +146,7 @@ class Lens:
                     ts = sub_table.to_pylist()
                     if is_query:
                         ts = ts[0]
-                    rtn = [field_type.parse_obj(t) for t in ts]
+                    rtn = [field_type.model_validate(t) for t in ts]
                 elif self.variant == "table":
                     return sub_table
                 else:
@@ -166,7 +166,7 @@ class Lens:
         else:
             sub_table = table["value"] if is_query else table
             if self.variant == "default" or self.variant == "file":
-                rtn = self.type.parse_obj(sub_table.to_pylist()[0])
+                rtn = self.type.model_validate(sub_table.to_pylist()[0])
             elif self.variant == "table":
                 return sub_table
             else:
@@ -245,7 +245,7 @@ class Lens:
             if len(value) == 0:
                 raise RuntimeError("pond can not yet write empty lists")
             elif isinstance(value[0], BaseModel):
-                value_to_write = [v.dict() for v in value]
+                value_to_write = [v.model_dump() for v in value]
                 per_row = True
                 print("WRITING FIRST VALUE: ", value_to_write)
             # elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
@@ -256,7 +256,7 @@ class Lens:
         # elif issubclass(self.type, File):
         #     if self.variant == "file":
         elif isinstance(value, BaseModel):
-            value_to_write = [value.dict()]
+            value_to_write = [value.model_dump()]
         # elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
         elif field_type in FIELD_MAP:
             print("Writing simple type that is not a list")
