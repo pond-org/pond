@@ -8,12 +8,12 @@ from conf.catalog import Navigation, Values
 
 
 def write_pickle(object: Any, fs, path: str):
-    with fs.open(f"{path}.pickle", mode="wb") as fs_file:
+    with fs.open(path, mode="wb") as fs_file:
         pickle.dump(object, fs_file)
 
 
 def read_pickle(fs, path: str) -> Any:
-    with fs.open(f"{path}.pickle", mode="rb") as fs_file:
+    with fs.open(path, mode="rb") as fs_file:
         return pickle.load(fs_file)
 
 
@@ -30,13 +30,13 @@ class FileDrive(BaseModel):
 # NOTE: fsspec does not have type interfaces?
 def write_image(im: Image.Image, fs, path: str):
     print(f"Trying to write {path}")
-    with fs.open(f"{path}.png", mode="wb") as fs_file:
+    with fs.open(path, mode="wb") as fs_file:
         im.save(fs_file)
 
 
 def read_image(fs, path: str) -> Image.Image:
     print(f"Trying to read {path}")
-    with fs.open(f"{path}.png", mode="rb") as fs_file:
+    with fs.open(path, mode="rb") as fs_file:
         return Image.open(fs_file).copy()
 
 
