@@ -18,8 +18,12 @@ def read_pickle(fs, path: str) -> Any:
 
 
 class FileDrive(BaseModel):
-    navigation: File[list[Navigation]] = Field(reader=read_pickle, writer=write_pickle)
-    images: File[list[float]] = Field(reader=read_pickle, writer=write_pickle)
+    navigation: File[list[Navigation]] = Field(
+        reader=read_pickle, writer=write_pickle, ext="pickle"
+    )
+    images: File[list[float]] = Field(
+        reader=read_pickle, writer=write_pickle, ext="pickle"
+    )
     uncertainty: list[float]
 
 
@@ -37,6 +41,6 @@ def read_image(fs, path: str) -> Image.Image:
 
 
 class FileCatalog(BaseModel):
-    image: File[Image.Image] = Field(reader=read_image, writer=write_image)
+    image: File[Image.Image] = Field(reader=read_image, writer=write_image, ext="png")
     drives: list[FileDrive]
-    values: File[Values] = Field(reader=read_pickle, writer=write_pickle)
+    values: File[Values] = Field(reader=read_pickle, writer=write_pickle, ext="pickle")

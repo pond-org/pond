@@ -30,7 +30,11 @@ def read_image(fs, path: str) -> Image.Image:
 
 
 class VariantCatalog(BaseModel):
-    image: File[Image.Image] = Field(reader=read_image, writer=write_image)
-    images: list[File[Image.Image]] = Field(reader=read_image, writer=write_image)
-    value: File[int] = Field(reader=read_pickle, writer=write_pickle)
-    values: list[File[int]] = Field(reader=read_pickle, writer=write_pickle)
+    image: File[Image.Image] = Field(reader=read_image, writer=write_image, ext="png")
+    images: list[File[Image.Image]] = Field(
+        reader=read_image, writer=write_image, ext="png"
+    )
+    value: File[int] = Field(reader=read_pickle, writer=write_pickle, ext="pickle")
+    values: list[File[int]] = Field(
+        reader=read_pickle, writer=write_pickle, ext="pickle"
+    )

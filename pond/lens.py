@@ -118,10 +118,60 @@ class Lens:
             return pa.Table
         raise RuntimeError(f"pond does not support lens variant {self.variant}")
 
+    def index_files(self):
+        self.index_files_impl(
+            self.lens_path.to_volume_path(), self.type, self.extra_args
+        )
+
+    def index_files_impl(self, path: str, model_type: Type, extra_args: dict):
+        lens_path = ""  # TODO
+        per_row = False
+        if _generics.get_origin(model_type) == File:
+            # NOTE: we need to check existence and extension here
+            ext = extra_args["ext"]
+            value = File(path=f"{path}.{ext}")
+            schema = get_pyarrow_schema(model_type)
+            table = pa.Table.from_pylist([value.model_dump()], schema=schema)
+            # writer(model.get(), self.fs, f"{self.storage_path}/{path}")
+            self.catalog.write_table(table, lens_path, schema, per_row=per_row)
+        elif (
+            get_origin(model_type) is list
+            and _generics.get_origin(get_args(model_type)[0]) is File
+        ):
+            # for i, value in enumerate(model):
+            #     self.index_files_impl(f"{path}/{i}", value)
+            ext = extra_args["ext"]
+            listing = self.fs.ls(path)
+            values = []
+            for info in listing:
+                if info["type"] == "file":
+                    value = File(path=info["name"])
+                    values.append(value.model_dump())
+            schema = get_pyarrow_schema(model_type)
+            table = pa.Table.from_pylist(values, schema=schema)
+            self.catalog.write_table(table, lens_path, schema, per_row=per_row)
+        elif get_origin(model_type) is list:
+            item_type = get_args(model_type)[0]
+            # TODO: does this make sense, to add the dataset if
+            # there are files available in the subfolder?
+            # or should we just list all the folders here instead?
+            listing = self.fs.ls(path)
+            for info in listing:
+                if info["type"] == "directory":
+                    name = info["name"]
+                    self.index_files_impl(f"{path}/{name}", item_type, extra_args)
+        elif issubclass(model_type, BaseModel):
+            for field in model_type.model_fields:
+                extra_args = model_type.model_fields[field].json_schema_extra
+                field_type = model_type.model_fields[field].annotation
+                print(f"Trying to set {path}/{field} with extra args {extra_args}")
+                self.index_files_impl(f"{path}/{field}", field_type, extra_args)
+
     def get_file_paths(self, model: Any, extra_args: dict):
         if isinstance(model, File):
             reader = extra_args["reader"]
-            model.object = reader(self.fs, f"{self.storage_path}/{model.path}")
+            ext = extra_args["ext"]
+            model.object = reader(self.fs, f"{self.storage_path}/{model.path}.{ext}")
         elif isinstance(model, list):
             for i, value in enumerate(model):
                 self.get_file_paths(value, extra_args)
@@ -192,7 +242,8 @@ class Lens:
         if isinstance(model, File):
             model.path = path
             writer = extra_args["writer"]
-            writer(model.get(), self.fs, f"{self.storage_path}/{path}")
+            ext = extra_args["ext"]
+            writer(model.get(), self.fs, f"{self.storage_path}/{path}.{ext}")
         elif isinstance(model, list):
             for i, value in enumerate(model):
                 self.set_file_paths(f"{path}/{i}", value, extra_args)
