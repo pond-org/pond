@@ -81,6 +81,7 @@ def test_index_files(request, catalog, tmp_path_factory, data_catalog_fixture):
 
     for i, drive in enumerate(catalog.drives):
         navs = drive.navigation.get()
+        images = drive.images.get()
         os.makedirs(
             os.path.join(storage_path, "catalog", "drives", f"{i}"), exist_ok=True
         )
@@ -92,6 +93,14 @@ def test_index_files(request, catalog, tmp_path_factory, data_catalog_fixture):
         ) as f:
             pickle.dump(
                 navs,
+                f,
+            )
+        with open(
+            os.path.join(storage_path, "catalog", "drives", f"{i}", "images.pickle"),
+            "wb",
+        ) as f:
+            pickle.dump(
+                images,
                 f,
             )
 
@@ -119,17 +128,39 @@ def test_index_files(request, catalog, tmp_path_factory, data_catalog_fixture):
     ), f"got size {repr(target.size)}, expected {repr(src.size)}"
     assert target.tobytes() == src.tobytes()
 
-    # lens = Lens(FileCatalog, "values", data_catalog, root_path, storage_path)
-    # value = lens.get()
-    # assert value.path == "catalog/values"
-    # assert value.get() == catalog.values.get()
+    lens = Lens(FileCatalog, "images", data_catalog, root_path, storage_path)
+    value = lens.get()
+    for i, image in enumerate(catalog.images):
+        # TODO: make this work as well
+        # lens = Lens(FileCatalog, f"images[{i}]", data_catalog, root_path, storage_path)
+        # value = lens.get()
+        assert value[i].path == f"catalog/images/test_{i}"
+        src = image.get()
+        target = value[i].get()
+        assert (
+            target.mode == src.mode
+        ), f"got mode {repr(target.mode)}, expected {repr(src.mode)}"
+        assert (
+            target.size == src.size
+        ), f"got size {repr(target.size)}, expected {repr(src.size)}"
+        assert target.tobytes() == src.tobytes()
 
-    # lens = Lens(
-    #     FileCatalog, "drives[0].navigation", data_catalog, root_path, storage_path
-    # )
-    # value = lens.get()
-    # assert value.path == "catalog/drives/0/navigation"
-    # assert value.get() == catalog.drives[0].navigation.get()
+    lens = Lens(FileCatalog, "values", data_catalog, root_path, storage_path)
+    value = lens.get()
+    assert value.path == "catalog/values"
+    assert value.get() == catalog.values.get()
+
+    lens = Lens(
+        FileCatalog, "drives[0].navigation", data_catalog, root_path, storage_path
+    )
+    value = lens.get()
+    assert value.path == "catalog/drives/0/navigation"
+    assert value.get() == catalog.drives[0].navigation.get()
+
+    lens = Lens(FileCatalog, "drives[1].images", data_catalog, root_path, storage_path)
+    value = lens.get()
+    assert value.path == "catalog/drives/1/images"
+    assert value.get() == catalog.drives[1].images.get()
 
     # lens = Lens(FileCatalog, "drives", data_catalog, root_path, storage_path)
     # value = lens.get()

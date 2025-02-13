@@ -1,3 +1,4 @@
+import os
 from typing import List, Type, Any, get_args, get_origin
 
 import datetime
@@ -158,12 +159,28 @@ class Lens:
                 print(info["name"][-(len(ext) + 1) :])
                 print(ext)
                 if (
-                    info["type"] == "file"
-                    and info["name"][-(len(ext) + 1) :] == f".{ext}"
+                    info["type"]
+                    == "file"
+                    # and self.fs.path.splitext(info["name"][-(len(ext) + 1) :] == f".{ext}"
                 ):
+                    # item_path = self.fs.path.relativefrom(
+                    #     self.storage_path, info["name"]
+                    # )
+                    # item_name, item_ext = self.fs.splitext(item_path)
+                    item_path = info["name"][len(str(self.storage_path)) + 1 :]
+                    item_path, item_ext = item_path.split(".")
+                    # assert (
+                    #     len(parts) == 2
+                    # ), f"pond only deals with files with 1 ext, found {parts}"
+                    # item_path = item_path[0]
+                    # item_ext = item_path[1]
+                    # item_name, item_ext = os.path.splitext(item_path)
+                    # item_ext = item_ext.strip(".").lower()
                     print("Found file: ", info["name"])
-                    value = File(path=info["name"])
-                    values.append(value.model_dump())
+                    print("Parts: ", item_path, item_ext)
+                    if item_ext == ext:
+                        value = File(path=item_path)
+                        values.append(value.model_dump())
             schema = get_pyarrow_schema(model_type)
             table = pa.Table.from_pylist(values, schema=schema)
             print(f"Writing {lens_path} with values {values}")
