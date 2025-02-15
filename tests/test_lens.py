@@ -64,6 +64,24 @@ def test_db():
 @pytest.mark.parametrize(
     ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
 )
+def test_set_get_index(request, catalog, data_catalog_fixture):
+    data_catalog = request.getfixturevalue(data_catalog_fixture)
+    lens = Lens(Catalog, "drives", data_catalog)
+    print("FIRST LENS PATH: ", lens.lens_path)
+    lens.set(catalog.drives)
+    lens = Lens(Catalog, "drives[0]", data_catalog)
+    print("SECOND LENS PATH: ", lens.lens_path)
+    value = lens.get()
+    assert value == catalog.drives[0]
+    lens = Lens(Catalog, "drives[1]", data_catalog)
+    print("SECOND LENS PATH: ", lens.lens_path)
+    value = lens.get()
+    assert value == catalog.drives[1]
+
+
+@pytest.mark.parametrize(
+    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+)
 def test_set_entry(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
     lens = Lens(Catalog, "values", data_catalog)  # , db_path=path)

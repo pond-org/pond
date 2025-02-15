@@ -45,12 +45,16 @@ class LensPath:
                 parts.append(f"[{field.index+1}]")
         return "".join(parts)
 
-    def to_fspath(self, level: int = 1) -> os.PathLike:
+    def to_fspath(self, level: int = 1, last_index: bool = True) -> os.PathLike:
         assert level >= 1 and level <= len(self.path)
-        entries = map(
-            lambda p: p.name if p.index is None else f"{p.name}[{p.index}]",
-            self.path[:level],
+        entries = list(
+            map(
+                lambda p: p.name if p.index is None else f"{p.name}[{p.index}]",
+                self.path[:level],
+            )
         )
+        if not last_index and self.path[level - 1].index is not None:
+            entries[-1] = self.path[level - 1].name
         return "/".join(entries)
 
     def to_volume_path(self) -> os.PathLike:
@@ -60,8 +64,10 @@ class LensPath:
         )
         return "/".join(entries)
 
-    def path_and_query(self, level: int = 1) -> tuple[os.PathLike, str]:
-        return self.to_fspath(level), self.get_db_query(level)
+    def path_and_query(
+        self, level: int = 1, last_index: bool = True
+    ) -> tuple[os.PathLike, str]:
+        return self.to_fspath(level, last_index), self.get_db_query(level)
 
 
 class AbstractCatalog(ABC):
@@ -102,7 +108,8 @@ class IcebergCatalog(AbstractCatalog):
         names = ["catalog"] + [
             p.name if p.index is None else f"{p.name}[{p.index}]" for p in path.path
         ]
-        print("Getting ident for ", path.path)
+        index = None
+        print("Getting ident for ", path.path, ":", names)
         for level in reversed(range(1, len(path.path) + 1)):
             print("At level ", level)
             # namespace = ".".join(names[: level - 1])
@@ -112,12 +119,29 @@ class IcebergCatalog(AbstractCatalog):
             if self.catalog.table_exists(identifier):
                 print(f"{identifier} does exist!")
                 break
-            else:
+            index = path.path[level - 1].index
+            if index is None:
                 print(f"{identifier} does not exist!")
+                continue
+
+            # we want to see if x.example as well as x.example[0]
+            identifier = ".".join(names[:level] + [path.path[level - 1].name])
+            if self.catalog.table_exists(identifier):
+                print(f"{identifier} does exist!")
+                break
+            index = None
+            print(f"{identifier} does not exist!")
         iceberg_table = self.catalog.load_table(identifier)
+        print(iceberg_table.scan().to_arrow())
         if query:
+            # iceberg queries can not be done
+            # on index, so we need to get all entries
             field = ".".join(q.name for q in query)
             table = iceberg_table.scan(selected_fields=(field,)).to_arrow()
+            if index is not None:
+                table = table.take((index,))
+            # if index is not None:
+            #     table = table[index][0]
 
             for level, q in enumerate(query):
                 if level < len(query) - 1 or q.index is not None:
@@ -133,6 +157,8 @@ class IcebergCatalog(AbstractCatalog):
                 table = pa.table({"value": [table]})
         else:
             table = iceberg_table.scan().to_arrow()
+            if index is not None:
+                table = table.take((index,))
         return table, bool(query)
 
 
@@ -163,17 +189,28 @@ class LanceCatalog(AbstractCatalog):
         return True
 
     def load_table(self, path: LensPath) -> tuple[pa.Table | None, bool]:
+        offset = None
+        limit = None
         for level in reversed(range(1, len(path.path) + 1)):
-            field_path, query = path.path_and_query(level)
+            field_path, query = path.path_and_query(level, last_index=True)
             fs_path = os.path.join(self.db_path, f"{field_path}.lance")
             if os.path.exists(fs_path):
                 break
+            offset = path.path[level - 1].index
+            if offset is None:
+                continue
+            field_path, query = path.path_and_query(level, last_index=False)
+            fs_path = os.path.join(self.db_path, f"{field_path}.lance")
+            if os.path.exists(fs_path):
+                limit = 1
+                break
+            offset = None
         ds = lance.dataset(fs_path)
         print(f"Getting {query} from {fs_path}")
         if query:
             print("Table: ", ds.to_table())
-            table = ds.to_table(columns={"value": query})
+            table = ds.to_table(offset=offset, limit=limit, columns={"value": query})
             # return type.parse_obj(table.to_pylist()[0]["value"])
         else:
-            table = ds.to_table()
+            table = ds.to_table(offset=offset, limit=limit)
         return table, query
