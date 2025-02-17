@@ -120,10 +120,15 @@ class Lens:
         raise RuntimeError(f"pond does not support lens variant {self.variant}")
 
     def index_files(self):
-        self.index_files_impl(self.lens_path.path, self.type, self.extra_args)
+        self.index_files_impl(
+            self.lens_path.path,
+            self.lens_path.to_volume_path(),
+            self.type,
+            self.extra_args,
+        )
 
     def index_files_impl(
-        self, path: list[TypeField], model_type: Type, extra_args: dict
+        self, path: list[TypeField], file_path: str, model_type: Type, extra_args: dict
     ):
         # lens_path = ""  # TODO
         per_row = False
@@ -132,11 +137,11 @@ class Lens:
             # NOTE: we need to check existence and extension here
             ext = extra_args["ext"]
             lens_path = LensPath(path=path)
-            fs_path = f"{self.storage_path}/{lens_path.to_volume_path()}.{ext}"
+            fs_path = f"{self.storage_path}/{file_path}.{ext}"
             if not self.fs.exists(fs_path):
                 print("FILE DOES NOT EXIST: ", fs_path)
                 return
-            value = File(path=lens_path.to_volume_path())
+            value = File(path=file_path)
             schema = get_pyarrow_schema(model_type)
             table = pa.Table.from_pylist([value.model_dump()], schema=schema)
             # writer(model.get(), self.fs, f"{self.storage_path}/{path}")
@@ -151,9 +156,9 @@ class Lens:
             #     self.index_files_impl(f"{path}/{i}", value)
             ext = extra_args["ext"]
             lens_path = LensPath(path=path)
-            fs_path = f"{self.storage_path}/{lens_path.to_volume_path()}"
-            print(f"Checking fs path {fs_path}")
-            listing = self.fs.ls(fs_path, detail=True)
+            # fs_path = f"{self.storage_path}/{lens_path.to_volume_path()}"
+            print(f"Checking fs path {file_path}")
+            listing = self.fs.ls(f"{self.storage_path}/{file_path}", detail=True)
             values = []
             for info in listing:
                 print(info["name"][-(len(ext) + 1) :])
@@ -191,18 +196,21 @@ class Lens:
             # TODO: does this make sense, to add the dataset if
             # there are files available in the subfolder?
             # or should we just list all the folders here instead?
-            lens_path = LensPath(path=path)
-            fs_path = f"{self.storage_path}/{lens_path.to_volume_path()}"
-            if not self.fs.exists(fs_path):
+            # lens_path = LensPath(path=path)
+            # fs_path = f"{self.storage_path}/{lens_path.to_volume_path()}"
+            if not self.fs.exists(f"{self.storage_path}/{file_path}"):
                 return
-            listing = self.fs.ls(fs_path, detail=True)
+            listing = self.fs.ls(f"{self.storage_path}/{file_path}", detail=True)
             counter = 0
             for info in listing:
                 if info["type"] == "directory":
-                    name = info["name"]
+                    item_name = info["name"].split("/")[-1]
                     item_path = list(path)
                     item_path[-1].index = counter
-                    self.index_files_impl(item_path, item_type, extra_args)
+                    item_file_path = f"{file_path}/{item_name}"
+                    self.index_files_impl(
+                        item_path, item_file_path, item_type, extra_args
+                    )
                     counter += 1
         elif issubclass(model_type, BaseModel):
             print(f"Checking model: {path}")
@@ -210,8 +218,11 @@ class Lens:
                 extra_args = model_type.model_fields[field].json_schema_extra
                 field_type = model_type.model_fields[field].annotation
                 field_path = path + [TypeField(field, None)]
+                field_file_path = f"{file_path}/{field}"
                 # print(f"Trying to set {path}/{field} with extra args {extra_args}")
-                self.index_files_impl(field_path, field_type, extra_args)
+                self.index_files_impl(
+                    field_path, field_file_path, field_type, extra_args
+                )
 
     def get_file_paths(self, model: Any, extra_args: dict):
         if isinstance(model, File):

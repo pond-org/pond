@@ -83,11 +83,11 @@ def test_index_files(request, catalog, tmp_path_factory, data_catalog_fixture):
         navs = drive.navigation.get()
         images = drive.images.get()
         os.makedirs(
-            os.path.join(storage_path, "catalog", "drives", f"{i}"), exist_ok=True
+            os.path.join(storage_path, "catalog", "drives", f"test_{i}"), exist_ok=True
         )
         with open(
             os.path.join(
-                storage_path, "catalog", "drives", f"{i}", "navigation.pickle"
+                storage_path, "catalog", "drives", f"test_{i}", "navigation.pickle"
             ),
             "wb",
         ) as f:
@@ -96,7 +96,9 @@ def test_index_files(request, catalog, tmp_path_factory, data_catalog_fixture):
                 f,
             )
         with open(
-            os.path.join(storage_path, "catalog", "drives", f"{i}", "images.pickle"),
+            os.path.join(
+                storage_path, "catalog", "drives", f"test_{i}", "images.pickle"
+            ),
             "wb",
         ) as f:
             pickle.dump(
@@ -154,13 +156,13 @@ def test_index_files(request, catalog, tmp_path_factory, data_catalog_fixture):
         FileCatalog, "drives[0].navigation", data_catalog, root_path, storage_path
     )
     value = lens.get()
-    assert value.path == "catalog/drives/0/navigation"
-    assert value.get() == catalog.drives[0].navigation.get()
+    assert value.path == "catalog/drives/test_1/navigation"
+    assert value.get() == catalog.drives[1].navigation.get()
 
     lens = Lens(FileCatalog, "drives[1].images", data_catalog, root_path, storage_path)
     value = lens.get()
-    assert value.path == "catalog/drives/1/images"
-    assert value.get() == catalog.drives[1].images.get()
+    assert value.path == "catalog/drives/test_0/images"
+    assert value.get() == catalog.drives[0].images.get()
 
     # lens = Lens(FileCatalog, "drives", data_catalog, root_path, storage_path)
     # value = lens.get()
