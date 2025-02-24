@@ -14,7 +14,7 @@ from conf.file_catalog import (
 )
 
 from pond.field import File, Field
-from pond import Lens
+from pond import Lens, State
 from tests.test_utils import (
     empty_iceberg_catalog,
     empty_lance_catalog,
@@ -64,11 +64,8 @@ def catalog() -> FileCatalog:
     return catalog
 
 
-@pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
-)
-def test_index_files(request, catalog, tmp_path_factory, data_catalog_fixture):
-    data_catalog = request.getfixturevalue(data_catalog_fixture)
+@pytest.fixture
+def filled_storage(tmp_path_factory, catalog):
     storage_path = tmp_path_factory.mktemp("storage")
 
     for i, image in enumerate(catalog.images):
@@ -112,12 +109,22 @@ def test_index_files(request, catalog, tmp_path_factory, data_catalog_fixture):
     ) as f:
         pickle.dump(catalog.values.get(), f)
 
+    return storage_path
+
+
+@pytest.mark.parametrize(
+    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+)
+def test_index_files(request, catalog, filled_storage, data_catalog_fixture):
+    data_catalog = request.getfixturevalue(data_catalog_fixture)
+    # storage_path = tmp_path_factory.mktemp("storage")
+
     root_path = "catalog"
-    lens = Lens(FileCatalog, "", data_catalog, root_path, storage_path)
+    lens = Lens(FileCatalog, "", data_catalog, root_path, filled_storage)
     lens.index_files()
     # lens.set(catalog)
 
-    lens = Lens(FileCatalog, "image", data_catalog, root_path, storage_path)
+    lens = Lens(FileCatalog, "image", data_catalog, root_path, filled_storage)
     value = lens.get()
     assert value.path == "catalog/image"
     src = catalog.image.get()
@@ -130,11 +137,11 @@ def test_index_files(request, catalog, tmp_path_factory, data_catalog_fixture):
     ), f"got size {repr(target.size)}, expected {repr(src.size)}"
     assert target.tobytes() == src.tobytes()
 
-    lens = Lens(FileCatalog, "images", data_catalog, root_path, storage_path)
+    lens = Lens(FileCatalog, "images", data_catalog, root_path, filled_storage)
     value = lens.get()
     for i, image in enumerate(catalog.images):
         # TODO: make this work as well
-        # lens = Lens(FileCatalog, f"images[{i}]", data_catalog, root_path, storage_path)
+        # lens = Lens(FileCatalog, f"images[{i}]", data_catalog, root_path, filled_storage)
         # value = lens.get()
         assert value[i].path == f"catalog/images/test_{i}"
         src = image.get()
@@ -147,19 +154,21 @@ def test_index_files(request, catalog, tmp_path_factory, data_catalog_fixture):
         ), f"got size {repr(target.size)}, expected {repr(src.size)}"
         assert target.tobytes() == src.tobytes()
 
-    lens = Lens(FileCatalog, "values", data_catalog, root_path, storage_path)
+    lens = Lens(FileCatalog, "values", data_catalog, root_path, filled_storage)
     value = lens.get()
     assert value.path == "catalog/values"
     assert value.get() == catalog.values.get()
 
     lens = Lens(
-        FileCatalog, "drives[0].navigation", data_catalog, root_path, storage_path
+        FileCatalog, "drives[0].navigation", data_catalog, root_path, filled_storage
     )
     value = lens.get()
     assert value.path == "catalog/drives/test_1/navigation"
     assert value.get() == catalog.drives[1].navigation.get()
 
-    lens = Lens(FileCatalog, "drives[1].images", data_catalog, root_path, storage_path)
+    lens = Lens(
+        FileCatalog, "drives[1].images", data_catalog, root_path, filled_storage
+    )
     value = lens.get()
     assert value.path == "catalog/drives/test_0/images"
     assert value.get() == catalog.drives[0].images.get()
@@ -167,3 +176,51 @@ def test_index_files(request, catalog, tmp_path_factory, data_catalog_fixture):
     # lens = Lens(FileCatalog, "drives", data_catalog, root_path, storage_path)
     # value = lens.get()
     # assert value == catalog.drives
+
+
+@pytest.mark.parametrize(
+    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+)
+def test_state_index_files(request, catalog, filled_storage, data_catalog_fixture):
+    data_catalog = request.getfixturevalue(data_catalog_fixture)
+
+    root_path = "catalog"
+    state = State(FileCatalog, data_catalog, root_path, filled_storage)
+    state.index_files()
+
+    value = state["image"]
+    assert value.path == "catalog/image"
+    src = catalog.image.get()
+    target = value.get()
+    assert (
+        target.mode == src.mode
+    ), f"got mode {repr(target.mode)}, expected {repr(src.mode)}"
+    assert (
+        target.size == src.size
+    ), f"got size {repr(target.size)}, expected {repr(src.size)}"
+    assert target.tobytes() == src.tobytes()
+
+    value = state["images"]
+    for i, image in enumerate(catalog.images):
+        assert value[i].path == f"catalog/images/test_{i}"
+        src = image.get()
+        target = value[i].get()
+        assert (
+            target.mode == src.mode
+        ), f"got mode {repr(target.mode)}, expected {repr(src.mode)}"
+        assert (
+            target.size == src.size
+        ), f"got size {repr(target.size)}, expected {repr(src.size)}"
+        assert target.tobytes() == src.tobytes()
+
+    value = state["values"]
+    assert value.path == "catalog/values"
+    assert value.get() == catalog.values.get()
+
+    value = state["drives[0].navigation"]
+    assert value.path == "catalog/drives/test_1/navigation"
+    assert value.get() == catalog.drives[1].navigation.get()
+
+    value = state["drives[1].images"]
+    assert value.path == "catalog/drives/test_0/images"
+    assert value.get() == catalog.drives[0].images.get()

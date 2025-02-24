@@ -24,6 +24,11 @@ class State:
         )
         return lens
 
+    def index_files(self, paths: list[str] = [""]):
+        for path in paths:
+            lens = self.lens(path)
+            lens.index_files()
+
     def __getitem__(self, path: str) -> Any:
         return self.lens(path).get()
 
