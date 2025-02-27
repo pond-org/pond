@@ -75,6 +75,15 @@ def get_tree_type(
     return type, extra_args
 
 
+def get_cleaned_path(path: str, root_path: str) -> tuple[str, LensPath]:
+    if matches := parse("{:l}:{}", path):
+        variant, path = matches
+    else:
+        variant = "default"
+    lens_path = LensPath.from_path(path, root_path)
+    return variant, lens_path
+
+
 FIELD_MAP = {
     str: pa.string(),
     bytes: pa.binary(),
@@ -87,27 +96,15 @@ FIELD_MAP = {
 }
 
 
-class Lens:
+class LensInfo:
     def __init__(
         self,
         root_type: Type[BaseModel],
         path: str,
-        catalog: AbstractCatalog,
         root_path: str = "catalog",
-        storage_path: str = ".",
-        # db_path: os.PathLike = "test_db",
     ):
-        if matches := parse("{:l}:{}", path):
-            self.variant, path = matches
-        else:
-            self.variant = "default"
-        self.lens_path = LensPath.from_path(path, root_path)
+        self.variant, self.lens_path = get_cleaned_path(path, root_path)
         self.type, self.extra_args = get_tree_type(self.lens_path.path[1:], root_type)
-        # self.db_path = db_path
-        # self.catalog = LanceCatalog(db_path)
-        self.catalog = catalog
-        self.storage_path = storage_path
-        self.fs = LocalFileSystem(auto_mkdir=True)
 
     def get_type(self) -> Type:
         if self.variant == "default":
@@ -118,6 +115,21 @@ class Lens:
         elif self.variant == "table":
             return pa.Table
         raise RuntimeError(f"pond does not support lens variant {self.variant}")
+
+
+class Lens(LensInfo):
+    def __init__(
+        self,
+        root_type: Type[BaseModel],
+        path: str,
+        catalog: AbstractCatalog,
+        root_path: str = "catalog",
+        storage_path: str = ".",
+    ):
+        super().__init__(root_type, path, root_path)
+        self.catalog = catalog
+        self.storage_path = storage_path
+        self.fs = LocalFileSystem(auto_mkdir=True)
 
     def index_files(self):
         self.index_files_impl(
