@@ -1,4 +1,5 @@
 import os
+from typing import Self
 from dataclasses import dataclass
 from abc import ABC
 
@@ -13,6 +14,14 @@ from pyiceberg.catalog import Catalog
 class TypeField:
     name: str
     index: int | None
+
+    def __eq__(self, other: Self) -> bool:
+        return self.name == other.name and self.index == other.index
+
+    def subset_of(self, other: Self):
+        return self.name == other.name and (
+            other.index is None or self.index == other.index
+        )
 
 
 @dataclass
@@ -35,6 +44,16 @@ class LensPath:
                 raise RuntimeError(f"Could not parse {c} as column")
             parts.append(TypeField(name, index))
         return LensPath(parts)
+
+    def __eq__(self, other: Self) -> bool:
+        return self.path == other.path
+
+    def subset_of(self, other: Self) -> bool:
+        if len(self.path) < len(other.path):
+            return False
+        return all(
+            a.subset_of(b) for a, b in zip(self.path[: len(other.path)], other.path)
+        )
 
     def get_db_query(self, level: int = 1) -> str:
         assert level >= 1 and level <= len(self.path)

@@ -7,7 +7,7 @@ from functools import partial
 import pytest
 
 from pond.abstract_catalog import LanceCatalog
-from pond import Lens, Transform
+from pond import Lens, Transform, State
 from tests.test_utils import (
     catalog,
     filled_iceberg_catalog,
@@ -32,32 +32,29 @@ def value1_value2_not_annotated(value1: Any) -> Any:
 )
 def test_transform(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
+    state = State(Catalog, data_catalog)
     lens = Lens(Catalog, "values.value1", data_catalog)
     lens.set(catalog.values.value1)
     transform = Transform(
+        Catalog,
+        "values.value1",
+        "values.value2",
         value1_value2,
+    )
+    transform.execute_on(state)
+    lens = Lens(Catalog, "values.value2", data_catalog)
+    assert lens.get() == value1_value2(catalog.values.value1)
+    transform = Transform(Catalog, ["values.value1"], ["values.value2"], value1_value2)
+    transform.execute_on(state)
+    lens = Lens(Catalog, "values.value2", data_catalog)
+    assert lens.get() == value1_value2(catalog.values.value1)
+    transform = Transform(
         Catalog,
         "values.value1",
         "values.value2",
-        data_catalog,
-    )
-    transform()
-    lens = Lens(Catalog, "values.value2", data_catalog)
-    assert lens.get() == value1_value2(catalog.values.value1)
-    transform = Transform(
-        value1_value2, Catalog, ["values.value1"], ["values.value2"], data_catalog
-    )
-    transform()
-    lens = Lens(Catalog, "values.value2", data_catalog)
-    assert lens.get() == value1_value2(catalog.values.value1)
-    transform = Transform(
         value1_value2_not_annotated,
-        Catalog,
-        "values.value1",
-        "values.value2",
-        data_catalog,
     )
-    transform()
+    transform.execute_on(state)
     lens = Lens(Catalog, "values.value2", data_catalog)
     assert lens.get() == value1_value2(catalog.values.value1)
 
@@ -71,10 +68,11 @@ def drive_id(input: Drive) -> Drive:
 )
 def test_list_items(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
+    state = State(Catalog, data_catalog)
     lens = Lens(Catalog, "drives[0]", data_catalog)
     lens.set(catalog.drives[0])
-    transform = Transform(drive_id, Catalog, "drives[0]", "drives[1]", data_catalog)
-    transform()
+    transform = Transform(Catalog, "drives[0]", "drives[1]", drive_id)
+    transform.execute_on(state)
     lens = Lens(Catalog, "drives[1]", data_catalog)
     assert catalog.drives[0] == lens.get()
 
@@ -88,15 +86,15 @@ def nav_list_id(input: list[Navigation]) -> list[Navigation]:
 )
 def test_list(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
+    state = State(Catalog, data_catalog)
     lens = Lens(Catalog, "drives[0]", data_catalog)
     lens.set(catalog.drives[0])
     transform = Transform(
-        nav_list_id,
         Catalog,
         "drives[0].navigation",
         "drives[1].navigation",
-        data_catalog,
+        nav_list_id,
     )
-    transform()
+    transform.execute_on(state)
     lens = Lens(Catalog, "drives[1].navigation", data_catalog)
     assert catalog.drives[0].navigation == lens.get()

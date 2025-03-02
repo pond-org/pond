@@ -1,37 +1,34 @@
 import os
 import warnings
 from collections import OrderedDict
-from typing import Callable, Type, get_type_hints, get_args, Any, Tuple
+from typing import Callable, Type, get_type_hints, get_args, Self, Tuple
 
 from pydantic import BaseModel
 from beartype.door import is_subhint
 from beartype.roar import BeartypeDoorNonpepException
 
-from pond.abstract_catalog import AbstractCatalog
-from pond.lens import Lens
+from pond.state import State
+from pond.lens import LensInfo, LensPath
+from pond.abstract_transform import AbstractTransform
 
 # from fbs_generated import Catalog as GenCatalog
 
 
-class Transform:
+class Transform(AbstractTransform):
     # TODO: make inputs/outputs work with dicts also
     def __init__(
         self,
-        fn: Callable,
         Catalog: Type[BaseModel],
         input: list[str] | str,
         output: list[str] | str,
-        # db_path: os.PathLike,
-        catalog: AbstractCatalog,
+        fn: Callable,
     ):
         self.fn = fn
-        self.input_lenses = OrderedDict(
-            (i, Lens(Catalog, i, catalog))  # , db_path=db_path))
-            for i in (input if isinstance(input, list) else [input])
-        )
+        self.inputs = input if isinstance(input, list) else [input]
+        self.outputs = output if isinstance(output, list) else [output]
+        self.input_lenses = OrderedDict((i, LensInfo(Catalog, i)) for i in self.inputs)
         self.output_lenses = OrderedDict(
-            (o, Lens(Catalog, o, catalog))  # , db_path=db_path))
-            for o in (output if isinstance(output, list) else [output])
+            (o, LensInfo(Catalog, o)) for o in self.outputs
         )
         types = get_type_hints(self.fn)
         try:
@@ -46,8 +43,6 @@ class Transform:
 
         if not isinstance(output_types, list):
             output_types = [output_types]
-
-        # input_types = list(types.values())
 
         for (input_name, input_type), (input_field_name, input_lens) in zip(
             types.items(), self.input_lenses.items(), strict=True
@@ -73,12 +68,21 @@ class Transform:
             except BeartypeDoorNonpepException as m:
                 warnings.warn(str(m))
 
-    def __call__(self) -> None:
-        args = [i.get() for i in self.input_lenses.values()]
+    def get_inputs(self) -> list[LensPath]:
+        return [i.lens_path for i in self.input_lenses]
+
+    def get_outputs(self) -> list[LensPath]:
+        return [o.lens_path for o in self.output_lenses]
+
+    def get_transforms(self) -> list[Self]:
+        return [self]
+
+    def execute_on(self, state: State) -> None:
+        args = [state[i] for i in self.inputs]
         rtns = self.fn(*args)
         if isinstance(rtns, tuple) and len(self.output_lenses) > 1:
             rtns_list = list(rtns)
         else:
             rtns_list = [rtns]
-        for rtn, o in zip(rtns_list, self.output_lenses.values()):
-            o.set(rtn)
+        for rtn, o in zip(rtns_list, self.outputs):
+            state[o] = rtn
