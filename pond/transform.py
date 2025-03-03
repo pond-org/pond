@@ -24,12 +24,10 @@ class Transform(AbstractTransform):
         fn: Callable,
     ):
         self.fn = fn
-        self.inputs = input if isinstance(input, list) else [input]
-        self.outputs = output if isinstance(output, list) else [output]
-        self.input_lenses = OrderedDict((i, LensInfo(Catalog, i)) for i in self.inputs)
-        self.output_lenses = OrderedDict(
-            (o, LensInfo(Catalog, o)) for o in self.outputs
-        )
+        inputs = input if isinstance(input, list) else [input]
+        outputs = output if isinstance(output, list) else [output]
+        self.input_lenses = OrderedDict((i, LensInfo(Catalog, i)) for i in inputs)
+        self.output_lenses = OrderedDict((o, LensInfo(Catalog, o)) for o in outputs)
         types = get_type_hints(self.fn)
         try:
             output_types = types.pop("return")
@@ -69,20 +67,20 @@ class Transform(AbstractTransform):
                 warnings.warn(str(m))
 
     def get_inputs(self) -> list[LensPath]:
-        return [i.lens_path for i in self.input_lenses]
+        return [i.lens_path for i in self.input_lenses.values()]
 
     def get_outputs(self) -> list[LensPath]:
-        return [o.lens_path for o in self.output_lenses]
+        return [o.lens_path for o in self.output_lenses.values()]
 
     def get_transforms(self) -> list[Self]:
         return [self]
 
     def execute_on(self, state: State) -> None:
-        args = [state[i] for i in self.inputs]
+        args = [state[i] for i in self.input_lenses.keys()]
         rtns = self.fn(*args)
         if isinstance(rtns, tuple) and len(self.output_lenses) > 1:
             rtns_list = list(rtns)
         else:
             rtns_list = [rtns]
-        for rtn, o in zip(rtns_list, self.outputs):
+        for rtn, o in zip(rtns_list, self.output_lenses.keys()):
             state[o] = rtn
