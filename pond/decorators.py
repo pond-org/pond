@@ -21,7 +21,7 @@ class node:
     def __call__(
         self,
         fn: Callable,
-    ):
+    ) -> Transform:
         return Transform(self.Catalog, self.input, self.output, fn)
 
 
@@ -30,5 +30,5 @@ def pipe(
     input: list[str] | str,
     output: list[str] | str,
     root_path: str = "catalog",
-):
+) -> TransformPipe:
     return TransformPipe(transforms, input, output, root_path)
