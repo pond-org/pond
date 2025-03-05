@@ -45,6 +45,14 @@ class LensPath:
             parts.append(TypeField(name, index))
         return LensPath(parts)
 
+    def to_path(self) -> str:
+        return ".".join(
+            map(
+                lambda t: t.name if t.index is None else f"{t.name}[{t.index}]",
+                self.path[1:],
+            )
+        )
+
     def __eq__(self, other: Self) -> bool:
         return self.path == other.path
 

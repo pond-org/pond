@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from pond.abstract_transform import AbstractTransform
 from pond.transform import Transform
 from pond.transform_pipe import TransformPipe
+from pond.transform_index import TransformIndex
 
 
 class node:
@@ -32,3 +33,10 @@ def pipe(
     root_path: str = "catalog",
 ) -> TransformPipe:
     return TransformPipe(transforms, input, output, root_path)
+
+
+def input_files(
+    Catalog: Type[BaseModel],
+    path: list[str] | str = "",
+) -> TransformIndex:
+    return TransformIndex(Catalog, path)

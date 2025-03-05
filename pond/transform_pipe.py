@@ -1,6 +1,7 @@
 from pond.lens import LensPath, get_cleaned_path
-from pond.abstract_transform import AbstractTransform
-from pond.transform import Transform
+from pond.abstract_transform import AbstractTransform, AbstractExecuteTransform
+
+# from pond.transform import Transform
 
 
 class TransformPipe(AbstractTransform):
@@ -39,5 +40,5 @@ class TransformPipe(AbstractTransform):
     def get_outputs(self) -> list[LensPath]:
         return self.outputs
 
-    def get_transforms(self) -> list[Transform]:
+    def get_transforms(self) -> list[AbstractExecuteTransform]:
         return sum([t.get_transforms() for t in self.transforms], [])

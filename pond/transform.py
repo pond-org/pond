@@ -9,12 +9,12 @@ from beartype.roar import BeartypeDoorNonpepException
 
 from pond.state import State
 from pond.lens import LensInfo, LensPath
-from pond.abstract_transform import AbstractTransform
+from pond.abstract_transform import AbstractTransform, AbstractExecuteTransform
 
 # from fbs_generated import Catalog as GenCatalog
 
 
-class Transform(AbstractTransform):
+class Transform(AbstractExecuteTransform):
     # TODO: make inputs/outputs work with dicts also
     def __init__(
         self,
