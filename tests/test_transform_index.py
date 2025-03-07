@@ -14,6 +14,7 @@ from tests.test_file_utils import FileCatalog, catalog, filled_storage
 def test_get_file_paths():
     t = TransformIndex(FileCatalog)
     outputs = t.get_outputs()
+    assert len(outputs) == 4
     assert LensPath.from_path("image") in outputs
     assert LensPath.from_path("images") in outputs
     assert LensPath.from_path("drives") in outputs
@@ -21,6 +22,7 @@ def test_get_file_paths():
     assert LensPath.from_path("dummy") not in outputs
     t = TransformIndex(FileCatalog, ["image", "values"])
     outputs = t.get_outputs()
+    assert len(outputs) == 2
     assert LensPath.from_path("image") in outputs
     assert LensPath.from_path("images") not in outputs
     assert LensPath.from_path("drives") not in outputs
