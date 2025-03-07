@@ -250,6 +250,13 @@ def test_path_and_query():
     assert path.path_and_query(2) == ("catalog/drives[0]", "navigation[1]")
 
 
+def test_to_path():
+    path = "drives[0].navigation[0].dummy"
+    lens_path = pond.lens.LensPath.from_path(path)
+    value = lens_path.to_path()
+    assert path == value
+
+
 @pytest.mark.skip(reason="no way of currently testing this")
 def test_append():
     values = Values(value1=0.5, value2=2, name="One", names=[])
