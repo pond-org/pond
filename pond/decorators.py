@@ -35,7 +35,7 @@ def pipe(
     return TransformPipe(transforms, input, output, root_path)
 
 
-def input_files(
+def index_files(
     Catalog: Type[BaseModel],
     path: list[str] | str = "",
 ) -> TransformIndex:

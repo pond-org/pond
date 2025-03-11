@@ -9,7 +9,7 @@ from pydantic._internal import _generics
 from pond.state import State
 from pond.lens import LensInfo, LensPath, TypeField
 from pond.field import File
-from pond.abstract_transform import AbstractExecuteTransform
+from pond.abstract_transform import AbstractExecuteTransform, AbstractExecuteUnit
 
 
 def get_file_paths(path: list[TypeField], model_type: Type) -> list[LensPath]:
@@ -39,6 +39,14 @@ def get_file_paths(path: list[TypeField], model_type: Type) -> list[LensPath]:
     return []
 
 
+class ExecuteIndex(AbstractExecuteUnit):
+    def __init__(self, inputs: list[LensPath], outputs: list[LensPath]):
+        super().__init__(inputs, outputs)
+
+    def execute_on(self, state: State) -> None:
+        state.index_files([o.to_path() for o in self.outputs])
+
+
 class TransformIndex(AbstractExecuteTransform):
     # TODO: make inputs/outputs work with dicts also
     def __init__(
@@ -62,5 +70,5 @@ class TransformIndex(AbstractExecuteTransform):
     def get_transforms(self) -> list[Self]:
         return [self]
 
-    def execute_on(self, state: State) -> None:
-        state.index_files([o.to_path() for o in self.outputs])
+    def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:
+        return [ExecuteIndex(inputs=[], outputs=self.outputs)]

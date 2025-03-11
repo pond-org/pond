@@ -354,6 +354,42 @@ wheels = [
 ]
 
 [[package]]
+name = "laspy"
+version = "2.5.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/07/62/d0ff891cba131f2643ee0152205b1d2eb9634fc690bb456ca87c06f645d4/laspy-2.5.4.tar.gz", hash = "sha256:eebdbf3379afbc0b24e7e4812fac567bff880d1e851f70175d22375aaecdf7e1", size = 1563243 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/bc/64/8be19bc661fe6281b1c9343f9caa18e187ddc9506abb20b0110e0d7eaed5/laspy-2.5.4-py3-none-any.whl", hash = "sha256:5fc37a8a1a5e22c98bad4123281b55e5e41784943ca251828d72c932b167583e", size = 84254 },
+]
+
+[package.optional-dependencies]
+lazrs = [
+    { name = "lazrs" },
+]
+
+[[package]]
+name = "lazrs"
+version = "0.6.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f1/ab/1bfa05016ad0bda818022d705b8590fbdcca4c5068f4d30452dec031422e/lazrs-0.6.2.tar.gz", hash = "sha256:e8581313c8f438b802baf92654bd0fde3cf4ecb8f881bdf4906934344bda3a9b", size = 10106 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/df/66/3beed17be74239b1253172e83b739d34a3167f24f1492289232f8ef470f0/lazrs-0.6.2-cp312-cp312-macosx_10_12_x86_64.whl", hash = "sha256:7de360431adc25a2f283dafa59653f127a4be52d64a1fd6791a3310d7ddc3dfc", size = 552020 },
+    { url = "https://files.pythonhosted.org/packages/11/91/075e9a611f52ba1a0b52850256560d240140bff0ea12df63b5b1b2c28ba9/lazrs-0.6.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:2678868a9428650b03e5c3f99453b6c0a118082d5f1d880f51d2de039725d3ca", size = 545896 },
+    { url = "https://files.pythonhosted.org/packages/57/3f/c1170c1a99ca5d80d5f42e7d01afbb0c2b67d39dfaa38ab97355def08017/lazrs-0.6.2-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:62f767986bbea4ba6a7f1be374b4c1aaab34a05040a9518660d4676cf6d632aa", size = 631904 },
+    { url = "https://files.pythonhosted.org/packages/64/83/d1918f0d6430cd99a19d2eb61adb587581c1face23930715fca21c95274a/lazrs-0.6.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:905e16279251047d648776b728c68e8f9040f450beb81a49d750d9173e0d76aa", size = 626776 },
+    { url = "https://files.pythonhosted.org/packages/c7/7e/000b3bf04e49dfef6799b72fc54793945848dfa0dfc8703a3405c05eefe2/lazrs-0.6.2-cp312-none-win32.whl", hash = "sha256:566c1fb46c89ae4ae903f6b45ab58a9c40f8bd85a30bde4b64f3913ca2c42441", size = 400971 },
+    { url = "https://files.pythonhosted.org/packages/27/91/a3e3dd5e929e10dc67154c6e4f28ae1e2f4c537547eb9ffef6922bad4d45/lazrs-0.6.2-cp312-none-win_amd64.whl", hash = "sha256:bf66df28856c9038b5f84a6c62b497e9588989fa9fab6f0e64cf8e5c73e515ec", size = 410817 },
+    { url = "https://files.pythonhosted.org/packages/b8/72/8103528bbe80aa1e138f9d92ee80ed2dbb32b1845e1b5a83eaa551b14d20/lazrs-0.6.2-cp313-cp313-macosx_10_12_x86_64.whl", hash = "sha256:99aa92279ae7a036b6940999fcc3569e70ff1f3a69e185e92de02878f6b5fc00", size = 551517 },
+    { url = "https://files.pythonhosted.org/packages/3c/1c/66ced114277572d5b63d4c36d30bb7b15d02317f15892035b17afb45b894/lazrs-0.6.2-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:d039a8dfe67bcc2aeb2f9e2292297b2c1cbc17decabc14c21233e8c57899d41c", size = 545314 },
+    { url = "https://files.pythonhosted.org/packages/97/3e/c1d87ca3f692bd81fda194643b289af2c40ac87d81863f6a43c3a929d9c8/lazrs-0.6.2-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0f5243056fd032822664738f8cb8d05f5ea5c892795083e1dabcb1faa53805fe", size = 626514 },
+    { url = "https://files.pythonhosted.org/packages/fc/53/8ef3b9d44dcbaf56138a75762c3325aa5587750f617a6ae91da7da3815d5/lazrs-0.6.2-cp313-none-win32.whl", hash = "sha256:e98e1aa8c1e1f9a42ad8f9dc6fcf8173bceb71864085a77dd40730c405cfd96b", size = 400543 },
+    { url = "https://files.pythonhosted.org/packages/1d/8e/5ab476871309af9160ce360a16573f8a5d8ad8cdc82d55c94c366f886e58/lazrs-0.6.2-cp313-none-win_amd64.whl", hash = "sha256:e61676dc4abc3a75f192202efa8a5202a24140d8b6317d534e8296b0ce41c3c0", size = 410293 },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -451,6 +487,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/38/e0/4f5855037a72cd8a7a2f60a3952d9aa45feedb37ae7831642102604e8a37/multidict-6.1.0-cp313-cp313-win32.whl", hash = "sha256:3a37ffb35399029b45c6cc33640a92bef403c9fd388acce75cdc88f58bd19a81", size = 26426 },
     { url = "https://files.pythonhosted.org/packages/7e/a5/17ee3a4db1e310b7405f5d25834460073a8ccd86198ce044dfaf69eac073/multidict-6.1.0-cp313-cp313-win_amd64.whl", hash = "sha256:e9aa71e15d9d9beaad2c6b9319edcdc0a49a43ef5c0a4c8265ca9ee7d6c67774", size = 28531 },
     { url = "https://files.pythonhosted.org/packages/99/b7/b9e70fde2c0f0c9af4cc5277782a89b66d35948ea3369ec9f598358c3ac5/multidict-6.1.0-py3-none-any.whl", hash = "sha256:48e171e52d1c4d33888e529b999e5900356b9ae588c2f09a52dcefb158b27506", size = 10051 },
+]
+
+[[package]]
+name = "narwhals"
+version = "1.30.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/c4/98/be6d35e8869ab9403fa25dc3458e7af6ce36dac2873c74c7274a59b21958/narwhals-1.30.0.tar.gz", hash = "sha256:0c50cc67a5404da501302882838ec17dce51703d22cd8ad89162d6f60ea0bb19", size = 253461 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e4/97/bde1e4cf1e0fe0d4c70f750b57d152c0ecb04bb35de7aa7950a5756a71d6/narwhals-1.30.0-py3-none-any.whl", hash = "sha256:443aa0a1abfae89bc65a6b888a7e310a03d1818bfb2ccd61c150199a5f954c17", size = 313611 },
 ]
 
 [[package]]
@@ -588,6 +633,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/e5/fb/a7960e838bc5df57a2ce23183bfd2290d97c33028b96bde332a9057834d3/pillow-11.1.0-cp313-cp313t-win32.whl", hash = "sha256:dda60aa465b861324e65a78c9f5cf0f4bc713e4309f83bc387be158b077963d9", size = 2295494 },
     { url = "https://files.pythonhosted.org/packages/d7/6c/6ec83ee2f6f0fda8d4cf89045c6be4b0373ebfc363ba8538f8c999f63fcd/pillow-11.1.0-cp313-cp313t-win_amd64.whl", hash = "sha256:ad5db5781c774ab9a9b2c4302bbf0c1014960a0a7be63278d13ae6fdf88126fe", size = 2631595 },
     { url = "https://files.pythonhosted.org/packages/cf/6c/41c21c6c8af92b9fea313aa47c75de49e2f9a467964ee33eb0135d47eb64/pillow-11.1.0-cp313-cp313t-win_arm64.whl", hash = "sha256:67cd427c68926108778a9005f2a04adbd5e67c442ed21d95389fe1d595458756", size = 2377651 },
+]
+
+[[package]]
+name = "plotly"
+version = "6.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "narwhals" },
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9c/80/761c14012d6daf18e12b6d1e4f6b218e999bcceb694d7a9b180154f9e4db/plotly-6.0.0.tar.gz", hash = "sha256:c4aad38b8c3d65e4a5e7dd308b084143b9025c2cc9d5317fc1f1d30958db87d3", size = 8111782 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0e/77/a946f38b57fb88e736c71fbdd737a1aebd27b532bda0779c137f357cf5fc/plotly-6.0.0-py3-none-any.whl", hash = "sha256:f708871c3a9349a68791ff943a5781b1ec04de7769ea69068adcd9202e57653a", size = 14805949 },
 ]
 
 [[package]]
@@ -816,9 +874,11 @@ dependencies = [
     { name = "beartype" },
     { name = "fsspec" },
     { name = "lancedb" },
+    { name = "laspy", extra = ["lazrs"] },
     { name = "pandas" },
     { name = "parse" },
     { name = "pillow" },
+    { name = "plotly" },
     { name = "pydantic-to-pyarrow" },
     { name = "pyiceberg", extra = ["pyarrow", "s3fs", "sql-sqlite"] },
     { name = "pytest" },
@@ -829,9 +889,11 @@ requires-dist = [
     { name = "beartype", specifier = ">=0.19.0" },
     { name = "fsspec", specifier = ">=2024.12.0" },
     { name = "lancedb", specifier = ">=0.17.0" },
+    { name = "laspy", extras = ["lazrs"], specifier = ">=2.5.4" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "parse", specifier = ">=1.20.2" },
     { name = "pillow", specifier = ">=11.1.0" },
+    { name = "plotly", specifier = ">=6.0.0" },
     { name = "pydantic-to-pyarrow", specifier = ">=0.1.5" },
     { name = "pyiceberg", extras = ["pyarrow", "s3fs", "sql-sqlite"], specifier = ">=0.8.1" },
     { name = "pytest", specifier = ">=8.3.4" },

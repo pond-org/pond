@@ -57,7 +57,8 @@ def test_execute_transform_pipe(request, catalog, data_catalog_fixture):
     p = TransformPipe([t1, t2], "drives[0].navigation", "drives[0].uncertainty")
     transforms = p.get_transforms()
     for transform in transforms:
-        transform.execute_on(state)
+        for unit in transform.get_execute_units(state):
+            unit.execute_on(state)
     value = state["drives[0].uncertainty"]
     assert value == nav_to_float(catalog.drives[0].navigation)
     assert len(transforms) == 2

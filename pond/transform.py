@@ -9,7 +9,12 @@ from beartype.roar import BeartypeDoorNonpepException
 
 from pond.state import State
 from pond.lens import LensInfo, LensPath
-from pond.abstract_transform import AbstractTransform, AbstractExecuteTransform
+from pond.abstract_transform import (
+    # AbstractTransform,
+    AbstractExecuteTransform,
+    AbstractExecuteUnit,
+    ExecuteTransform,
+)
 
 # from fbs_generated import Catalog as GenCatalog
 
@@ -75,12 +80,11 @@ class Transform(AbstractExecuteTransform):
     def get_transforms(self) -> list[Self]:
         return [self]
 
-    def execute_on(self, state: State) -> None:
-        args = [state[i] for i in self.input_lenses.keys()]
-        rtns = self.fn(*args)
-        if isinstance(rtns, tuple) and len(self.output_lenses) > 1:
-            rtns_list = list(rtns)
-        else:
-            rtns_list = [rtns]
-        for rtn, o in zip(rtns_list, self.output_lenses.keys()):
-            state[o] = rtn
+    def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:
+        return [
+            ExecuteTransform(
+                inputs=[i.lens_path for i in self.input_lenses.values()],
+                outputs=[o.lens_path for o in self.output_lenses.values()],
+                fn=self.fn,
+            )
+        ]

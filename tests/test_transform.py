@@ -41,11 +41,13 @@ def test_transform(request, catalog, data_catalog_fixture):
         "values.value2",
         value1_value2,
     )
-    transform.execute_on(state)
+    for unit in transform.get_execute_units(state):
+        unit.execute_on(state)
     lens = Lens(Catalog, "values.value2", data_catalog)
     assert lens.get() == value1_value2(catalog.values.value1)
     transform = Transform(Catalog, ["values.value1"], ["values.value2"], value1_value2)
-    transform.execute_on(state)
+    for unit in transform.get_execute_units(state):
+        unit.execute_on(state)
     lens = Lens(Catalog, "values.value2", data_catalog)
     assert lens.get() == value1_value2(catalog.values.value1)
     transform = Transform(
@@ -54,7 +56,8 @@ def test_transform(request, catalog, data_catalog_fixture):
         "values.value2",
         value1_value2_not_annotated,
     )
-    transform.execute_on(state)
+    for unit in transform.get_execute_units(state):
+        unit.execute_on(state)
     lens = Lens(Catalog, "values.value2", data_catalog)
     assert lens.get() == value1_value2(catalog.values.value1)
 
@@ -72,7 +75,8 @@ def test_list_items(request, catalog, data_catalog_fixture):
     lens = Lens(Catalog, "drives[0]", data_catalog)
     lens.set(catalog.drives[0])
     transform = Transform(Catalog, "drives[0]", "drives[1]", drive_id)
-    transform.execute_on(state)
+    for unit in transform.get_execute_units(state):
+        unit.execute_on(state)
     lens = Lens(Catalog, "drives[1]", data_catalog)
     assert catalog.drives[0] == lens.get()
 
@@ -95,6 +99,7 @@ def test_list(request, catalog, data_catalog_fixture):
         "drives[1].navigation",
         nav_list_id,
     )
-    transform.execute_on(state)
+    for unit in transform.get_execute_units(state):
+        unit.execute_on(state)
     lens = Lens(Catalog, "drives[1].navigation", data_catalog)
     assert catalog.drives[0].navigation == lens.get()

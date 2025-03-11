@@ -98,6 +98,9 @@ class LensPath:
 
 
 class AbstractCatalog(ABC):
+    def len(self, path: LensPath) -> int:
+        pass
+
     def write_table(self, table: pa.Table, path: LensPath) -> bool:
         pass
 
@@ -108,6 +111,11 @@ class AbstractCatalog(ABC):
 class IcebergCatalog(AbstractCatalog):
     def __init__(self, catalog: Catalog):
         self.catalog = catalog
+
+    # TODO: make this more efficient
+    def len(self, path: LensPath) -> int:
+        table, _ = self.load_table(path)
+        return table.num_rows
 
     def write_table(
         self, table: pa.Table, path: LensPath, schema: pa.Schema, per_row: bool = False
@@ -192,6 +200,11 @@ class IcebergCatalog(AbstractCatalog):
 class LanceCatalog(AbstractCatalog):
     def __init__(self, db_path: os.PathLike):
         self.db_path = db_path
+
+    # TODO: make this more efficient
+    def len(self, path: LensPath) -> int:
+        table, _ = self.load_table(path)
+        return table.num_rows
 
     def write_table(
         self, table: pa.Table, path: LensPath, schema: pa.Schema, per_row: bool = False
