@@ -113,6 +113,34 @@ def test_set_entry(request, catalog, data_catalog_fixture):
 @pytest.mark.parametrize(
     ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
 )
+def test_empty_list(request, catalog, data_catalog_fixture):
+    data_catalog = request.getfixturevalue(data_catalog_fixture)
+    lens = Lens(Catalog, "drives", data_catalog)  # , db_path=path)
+    lens.set([])
+    value = lens.get()
+    assert value == []
+    lens = Lens(Catalog, "values.names", data_catalog)  # , db_path=path)
+    lens.set([])
+    value = lens.get()
+    assert value == []
+
+
+@pytest.mark.parametrize(
+    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+)
+def test_append(request, catalog, data_catalog_fixture):
+    data_catalog = request.getfixturevalue(data_catalog_fixture)
+    lens = Lens(Catalog, "values.names", data_catalog)  # , db_path=path)
+    lens.set([])
+    lens.set(["one"], append=True)
+    lens.set(["two", "three"], append=True)
+    value = lens.get()
+    assert value == ["one", "two", "three"]
+
+
+@pytest.mark.parametrize(
+    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+)
 def test_set_part(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
     lens = Lens(Catalog, "values", data_catalog)  # , db_path=path)

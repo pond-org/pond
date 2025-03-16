@@ -322,7 +322,7 @@ class Lens(LensInfo):
                 print(f"Trying to set {path}/{field} with extra args {extra_args}")
                 self.set_file_paths(f"{path}/{field}", value, extra_args)
 
-    def set(self, value: EntryType) -> bool:
+    def set(self, value: EntryType, append: bool = False) -> bool:
         # TODO: check that value is of type self.type
         print("FS path: ", self.lens_path.path)
         fs_path = self.lens_path.to_fspath(level=len(self.lens_path.path))
@@ -363,10 +363,11 @@ class Lens(LensInfo):
             field_type = get_args(field_type)[0]
             print(field_type)
             if len(value) == 0:
-                raise RuntimeError("pond can not yet write empty lists")
+                # raise RuntimeError("pond can not yet write empty lists")
+                value_to_write = []
             elif isinstance(value[0], BaseModel):
                 value_to_write = [v.model_dump() for v in value]
-                per_row = True
+                # per_row = True
                 print("WRITING FIRST VALUE: ", value_to_write)
             # elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
             elif field_type in FIELD_MAP:
@@ -387,4 +388,11 @@ class Lens(LensInfo):
         print("Writing value: ", value_to_write)
         table = pa.Table.from_pylist(value_to_write, schema=schema)
         print("Table: ", table)
-        return self.catalog.write_table(table, self.lens_path, schema, per_row=per_row)
+        write_path = self.lens_path
+        if append and self.lens_path[-1].index is not None:
+            write_path = self.lens_path[:-1] + [
+                TypeField(self.lens_path[-1].name, None)
+            ]
+        return self.catalog.write_table(
+            table, write_path, schema, per_row=per_row, append=append
+        )
