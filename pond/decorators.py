@@ -2,10 +2,11 @@ from typing import Callable, Type
 
 from pydantic import BaseModel
 
-from pond.abstract_transform import AbstractTransform
+from pond.abstract_transform import AbstractTransform, AbstractExecuteTransform
 from pond.transform import Transform
 from pond.transform_pipe import TransformPipe
 from pond.transform_index import TransformIndex
+from pond.transform_list import TransformList
 
 
 class node:
@@ -22,7 +23,11 @@ class node:
     def __call__(
         self,
         fn: Callable,
-    ) -> Transform:
+    ) -> AbstractExecuteTransform:
+        inputs = self.input if isinstance(self.input, list) else [self.input]
+        for input in inputs:
+            if "[:]" in input:
+                return TransformList(self.Catalog, self.input, self.output, fn)
         return Transform(self.Catalog, self.input, self.output, fn)
 
 

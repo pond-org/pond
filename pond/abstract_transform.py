@@ -34,9 +34,16 @@ class AbstractExecuteUnit(ABC):
 
 
 class ExecuteTransform(AbstractExecuteUnit):
-    def __init__(self, inputs: list[LensPath], outputs: list[LensPath], fn: Callable):
+    def __init__(
+        self,
+        inputs: list[LensPath],
+        outputs: list[LensPath],
+        fn: Callable,
+        append_outputs: list[LensPath] = [],
+    ):
         super().__init__(inputs, outputs)
         self.fn = fn
+        self.append_outputs = append_outputs
 
     def execute_on(self, state: State) -> None:
         args = [state[i.to_path()] for i in self.inputs]
@@ -46,7 +53,11 @@ class ExecuteTransform(AbstractExecuteUnit):
         else:
             rtns_list = [rtns]
         for rtn, o in zip(rtns_list, self.outputs):
-            state[o.to_path()] = rtn
+            # state[o.to_path()] = rtn
+            append = o in self.append_outputs
+            if append:
+                print(f"WILL APPEND TO {o.to_path()}")
+            state.lens(o.to_path()).set(rtn, append)
 
 
 class AbstractExecuteTransform(AbstractTransform):

@@ -1,4 +1,6 @@
 import os
+import copy
+
 from typing import Self
 from dataclasses import dataclass
 from abc import ABC
@@ -52,6 +54,9 @@ class LensPath:
                 self.path[1:],
             )
         )
+
+    def clone(self) -> Self:
+        return copy.deepcopy(self)
 
     def __eq__(self, other: Self) -> bool:
         return self.path == other.path
@@ -143,6 +148,7 @@ class IcebergCatalog(AbstractCatalog):
             schema=schema,
         )
         if append:
+            # iceberg_table = self.catalog.load_table(".".join(names))
             iceberg_table.append(table)
         elif per_row:
             iceberg_table.overwrite(df=table.take([table.num_rows - 1]))

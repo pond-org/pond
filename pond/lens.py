@@ -106,6 +106,14 @@ class LensInfo:
         self.variant, self.lens_path = get_cleaned_path(path, root_path)
         self.type, self.extra_args = get_tree_type(self.lens_path.path[1:], root_type)
 
+    def set_index(self, index: int, value: int):
+        assert index >= 0
+        assert (
+            self.lens_path.path[index].index is not None
+        ), "Lens only supports setting index for list item lenses"
+        assert value >= 0
+        self.lens_path.path[index].index = value
+
     def get_type(self) -> Type:
         if self.variant == "default":
             return self.type
@@ -130,6 +138,9 @@ class Lens(LensInfo):
         self.catalog = catalog
         self.storage_path = storage_path
         self.fs = LocalFileSystem(auto_mkdir=True)
+
+    def len(self) -> int:
+        return self.catalog.len(self.lens_path)
 
     def index_files(self):
         self.index_files_impl(
@@ -388,11 +399,9 @@ class Lens(LensInfo):
         print("Writing value: ", value_to_write)
         table = pa.Table.from_pylist(value_to_write, schema=schema)
         print("Table: ", table)
-        write_path = self.lens_path
-        if append and self.lens_path[-1].index is not None:
-            write_path = self.lens_path[:-1] + [
-                TypeField(self.lens_path[-1].name, None)
-            ]
+        write_path = self.lens_path.path
+        if append and write_path[-1].index is not None:
+            write_path = write_path[:-1] + [TypeField(write_path[-1].name, None)]
         return self.catalog.write_table(
-            table, write_path, schema, per_row=per_row, append=append
+            table, LensPath(write_path), schema, per_row=per_row, append=append
         )
