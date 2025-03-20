@@ -101,7 +101,14 @@ class AbstractCatalog(ABC):
     def len(self, path: LensPath) -> int:
         pass
 
-    def write_table(self, table: pa.Table, path: LensPath) -> bool:
+    def write_table(
+        self,
+        table: pa.Table,
+        path: LensPath,
+        schema: pa.Schema,
+        per_row: bool,
+        append: bool,
+    ) -> bool:
         pass
 
     def load_table(self, path: LensPath) -> pa.Table | None:
@@ -118,7 +125,12 @@ class IcebergCatalog(AbstractCatalog):
         return table.num_rows
 
     def write_table(
-        self, table: pa.Table, path: LensPath, schema: pa.Schema, per_row: bool = False
+        self,
+        table: pa.Table,
+        path: LensPath,
+        schema: pa.Schema,
+        per_row: bool = False,
+        append: bool = False,
     ) -> bool:
         # names = [p.name for p in path.path]
         names = ["catalog"] + [
@@ -130,12 +142,14 @@ class IcebergCatalog(AbstractCatalog):
             identifier=".".join(names),
             schema=schema,
         )
-        if per_row:
-            iceberg_table.overwrite(df=table)
-        else:
+        if append:
+            iceberg_table.append(table)
+        elif per_row:
             iceberg_table.overwrite(df=table.take([table.num_rows - 1]))
             for row in reversed(range(0, table.num_rows - 1)):
                 iceberg_table.append(table.take([row]))
+        else:
+            iceberg_table.overwrite(df=table)
         return True
 
     def load_table(self, path: LensPath) -> tuple[pa.Table | None, bool]:
@@ -207,15 +221,21 @@ class LanceCatalog(AbstractCatalog):
         return table.num_rows
 
     def write_table(
-        self, table: pa.Table, path: LensPath, schema: pa.Schema, per_row: bool = False
+        self,
+        table: pa.Table,
+        path: LensPath,
+        schema: pa.Schema,
+        per_row: bool = False,
+        append: bool = False,
     ) -> bool:
         fs_path = path.to_fspath(level=len(path.path))
+        mode = "append" if append else "overwrite"
         if per_row:
             ds = lance.write_dataset(
                 table.take([0]),
                 os.path.join(self.db_path, f"{fs_path}.lance"),
                 schema=schema,
-                mode="overwrite",
+                mode=mode,
             )
             for row in range(1, table.num_rows):
                 ds.insert(table.take([row]))
@@ -224,7 +244,7 @@ class LanceCatalog(AbstractCatalog):
                 table,
                 os.path.join(self.db_path, f"{fs_path}.lance"),
                 schema=schema,
-                mode="overwrite",
+                mode=mode,
             )
         return True
 
