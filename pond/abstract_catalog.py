@@ -29,9 +29,12 @@ class TypeField:
 @dataclass
 class LensPath:
     path: list[TypeField]
+    variant: str = "default"
 
     @staticmethod
-    def from_path(path: str, root_path: str = "catalog") -> "LensPath":
+    def from_path(
+        path: str, root_path: str = "catalog", variant="default"
+    ) -> "LensPath":
         parts = [TypeField(root_path, None)]
         if path == "":
             return LensPath(parts)
@@ -45,15 +48,16 @@ class LensPath:
             else:
                 raise RuntimeError(f"Could not parse {c} as column")
             parts.append(TypeField(name, index))
-        return LensPath(parts)
+        return LensPath(parts, variant)
 
     def to_path(self) -> str:
-        return ".".join(
+        path = ".".join(
             map(
                 lambda t: t.name if t.index is None else f"{t.name}[{t.index}]",
                 self.path[1:],
             )
         )
+        return path if self.variant == "default" else f"{self.variant}:{path}"
 
     def clone(self) -> Self:
         return copy.deepcopy(self)

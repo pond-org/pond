@@ -80,8 +80,8 @@ def get_cleaned_path(path: str, root_path: str) -> tuple[str, LensPath]:
         variant, path = matches
     else:
         variant = "default"
-    lens_path = LensPath.from_path(path, root_path)
-    return variant, lens_path
+    lens_path = LensPath.from_path(path, root_path, variant)
+    return lens_path
 
 
 FIELD_MAP = {
@@ -103,7 +103,7 @@ class LensInfo:
         path: str,
         root_path: str = "catalog",
     ):
-        self.variant, self.lens_path = get_cleaned_path(path, root_path)
+        self.lens_path = get_cleaned_path(path, root_path)
         self.type, self.extra_args = get_tree_type(self.lens_path.path[1:], root_type)
 
     def set_index(self, index: int, value: int):
@@ -115,14 +115,16 @@ class LensInfo:
         self.lens_path.path[index].index = value
 
     def get_type(self) -> Type:
-        if self.variant == "default":
+        if self.lens_path.variant == "default":
             return self.type
-        elif self.variant == "file":
+        elif self.lens_path.variant == "file":
             assert issubclass(self.type, File)
             return _generics.get_args(self.type)[0]
-        elif self.variant == "table":
+        elif self.lens_path.variant == "table":
             return pa.Table
-        raise RuntimeError(f"pond does not support lens variant {self.variant}")
+        raise RuntimeError(
+            f"pond does not support lens variant {self.lens_path.variant}"
+        )
 
 
 class Lens(LensInfo):
@@ -273,16 +275,19 @@ class Lens(LensInfo):
             print(table.to_pylist())
             if issubclass(field_type, BaseModel):
                 sub_table = table["value"] if is_query else table
-                if self.variant == "default" or self.variant == "file":
+                if (
+                    self.lens_path.variant == "default"
+                    or self.lens_path.variant == "file"
+                ):
                     ts = sub_table.to_pylist()
                     if is_query:
                         ts = ts[0]
                     rtn = [field_type.model_validate(t) for t in ts]
-                elif self.variant == "table":
+                elif self.lens_path.variant == "table":
                     return sub_table
                 else:
                     raise RuntimeError(
-                        f"pond does not support lens variant {self.variant}"
+                        f"pond does not support lens variant {self.lens_path.variant}"
                     )
             else:
                 return (
@@ -296,17 +301,19 @@ class Lens(LensInfo):
             rtn = table.to_pylist()[0]["value"]
         else:
             sub_table = table["value"] if is_query else table
-            if self.variant == "default" or self.variant == "file":
+            if self.lens_path.variant == "default" or self.lens_path.variant == "file":
                 rtn = self.type.model_validate(sub_table.to_pylist()[0])
-            elif self.variant == "table":
+            elif self.lens_path.variant == "table":
                 return sub_table
             else:
-                raise RuntimeError(f"pond does not support lens variant {self.variant}")
+                raise RuntimeError(
+                    f"pond does not support lens variant {self.lens_path.variant}"
+                )
 
         assert rtn is not None
         self.get_file_paths(rtn, self.extra_args)
 
-        if self.variant == "file":
+        if self.lens_path.variant == "file":
             if _generics.get_origin(self.type) == File:
                 return rtn.get()
             elif (
@@ -360,7 +367,7 @@ class Lens(LensInfo):
         value_to_write = None
         per_row = False
 
-        if self.variant == "file":
+        if self.lens_path.variant == "file":
             if _generics.get_origin(self.type) == File:
                 value = File.set(value)
             elif (
@@ -370,7 +377,7 @@ class Lens(LensInfo):
                 value = [File.set(v) for v in value]
             else:
                 raise RuntimeError("pond requires file variant to have type File")
-        elif self.variant == "table":
+        elif self.lens_path.variant == "table":
             assert isinstance(
                 value, pa.Table
             ), "pond requires table variant to use a pyarrow table"

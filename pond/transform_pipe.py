@@ -14,11 +14,11 @@ class TransformPipe(AbstractTransform):
     ):
         self.transforms = transforms
         self.inputs = [
-            get_cleaned_path(i, root_path)[1]
+            get_cleaned_path(i, root_path)
             for i in (input if isinstance(input, list) else [input])
         ]
         self.outputs = [
-            get_cleaned_path(o, root_path)[1]
+            get_cleaned_path(o, root_path)
             for o in (output if isinstance(output, list) else [output])
         ]
         # Check if we can run these transforms in order
