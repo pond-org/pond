@@ -33,8 +33,8 @@ class node:
 
 def pipe(
     transforms: list[AbstractTransform],
-    input: list[str] | str,
-    output: list[str] | str,
+    input: list[str] | str = [],
+    output: list[str] | str = [],
     root_path: str = "catalog",
 ) -> TransformPipe:
     return TransformPipe(transforms, input, output, root_path)

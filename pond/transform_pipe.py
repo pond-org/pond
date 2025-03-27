@@ -8,8 +8,8 @@ class TransformPipe(AbstractTransform):
     def __init__(
         self,
         transforms: list[AbstractTransform],
-        input: list[str] | str,
-        output: list[str] | str,
+        input: list[str] | str = [],
+        output: list[str] | str = [],
         root_path: str = "catalog",
     ):
         self.transforms = transforms
@@ -32,7 +32,7 @@ class TransformPipe(AbstractTransform):
                 assert all(not o.subset_of(p) for p in produced)
                 produced.append(o)
         for o in self.outputs:
-            assert o in produced
+            assert o in produced, f"{o.to_path()} not in {self.outputs}"
 
     def get_inputs(self) -> list[LensPath]:
         return self.inputs
