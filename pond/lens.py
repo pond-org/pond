@@ -195,6 +195,7 @@ class Lens(LensInfo):
                     #     self.storage_path, info["name"]
                     # )
                     # item_name, item_ext = self.fs.splitext(item_path)
+                    print("Storage path: ", self.storage_path)
                     item_path = info["name"][len(str(self.storage_path)) + 1 :]
                     item_path, item_ext = item_path.split(".")
                     # assert (
@@ -318,20 +319,31 @@ class Lens(LensInfo):
 
         return rtn
 
-    def set_file_paths(self, path: str, model: Any, extra_args: dict):
+    def set_file_paths(self, path: str, model: Any, extra_args: dict) -> bool:
         if isinstance(model, File):
             model.path = path
             writer = extra_args["writer"]
             ext = extra_args["ext"]
             writer(model.get(), self.fs, f"{self.storage_path}/{path}.{ext}")
+            return True
         elif isinstance(model, list):
-            for i, value in enumerate(model):
-                self.set_file_paths(f"{path}/{i}", value, extra_args)
+            if len(model) == 0 or not self.set_file_paths(
+                f"{path}/0", model[0], extra_args
+            ):
+                return False
+            for i, value in enumerate(model[1:]):
+                self.set_file_paths(f"{path}/{i+1}", value, extra_args)
+            return True
         elif isinstance(model, BaseModel):
+            found = False
             for field, value in model:
                 extra_args = model.model_fields[field].json_schema_extra
                 print(f"Trying to set {path}/{field} with extra args {extra_args}")
-                self.set_file_paths(f"{path}/{field}", value, extra_args)
+                found = (
+                    self.set_file_paths(f"{path}/{field}", value, extra_args) or found
+                )
+            return found
+        return False
 
     def set(self, value: EntryType, append: bool = False) -> bool:
         # TODO: check that value is of type self.type
