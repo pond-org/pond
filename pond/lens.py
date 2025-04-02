@@ -118,8 +118,14 @@ class LensInfo:
         if self.lens_path.variant == "default":
             return self.type
         elif self.lens_path.variant == "file":
-            assert issubclass(self.type, File)
-            return _generics.get_args(self.type)[0]
+            print("Type: ", self.type)
+            if get_origin(self.type) == list:
+                item_type = get_args(self.type)[0]
+                assert issubclass(item_type, File)
+                return list[_generics.get_args(item_type)[0]]
+            else:
+                assert issubclass(self.type, File)
+                return _generics.get_args(self.type)[0]
         elif self.lens_path.variant == "table":
             return pa.Table
         raise RuntimeError(
@@ -284,7 +290,24 @@ class Lens(LensInfo):
                         ts = ts[0]
                     rtn = [field_type.model_validate(t) for t in ts]
                 elif self.lens_path.variant == "table":
-                    return sub_table
+                    # return pa.Table.from_batches(
+                    #     sub_table, schema=get_pyarrow_schema(self.type)
+                    # )
+                    # print("SUBTABLE:", type(sub_table[0][0]))
+                    # return pa.Table.from_arrays(
+                    #     sub_table[0], schema=get_pyarrow_schema(self.type)
+                    # )
+                    # return pa.Table.from_struct_array(sub_table[0][0])
+                    if is_query:
+                        return pa.Table.from_batches(
+                            [
+                                pa.RecordBatch.from_struct_array(s.flatten())
+                                for s in sub_table.iterchunks()
+                            ],
+                            schema=get_pyarrow_schema(self.type),
+                        )
+                    else:
+                        return sub_table
                 else:
                     raise RuntimeError(
                         f"pond does not support lens variant {self.lens_path.variant}"
@@ -304,7 +327,16 @@ class Lens(LensInfo):
             if self.lens_path.variant == "default" or self.lens_path.variant == "file":
                 rtn = self.type.model_validate(sub_table.to_pylist()[0])
             elif self.lens_path.variant == "table":
-                return sub_table
+                if is_query:
+                    return pa.Table.from_batches(
+                        [
+                            pa.RecordBatch.from_struct_array(s.flatten())
+                            for s in sub_table.iterchunks()
+                        ],
+                        schema=get_pyarrow_schema(self.type),
+                    )
+                else:
+                    return sub_table
             else:
                 raise RuntimeError(
                     f"pond does not support lens variant {self.lens_path.variant}"

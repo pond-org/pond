@@ -51,6 +51,7 @@ class Transform(AbstractExecuteTransform):
             types.items(), self.input_lenses.items(), strict=True
         ):
             try:
+                print("Type: ", input_lens.get_type())
                 type_checks = is_subhint(input_lens.get_type(), input_type)
                 assert (
                     type_checks
