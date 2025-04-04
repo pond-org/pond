@@ -26,10 +26,14 @@ class TransformPipe(AbstractTransform):
         for transform in transforms:
             for i in transform.get_inputs():
                 # assert i in produced
-                assert any(i.subset_of(p) for p in produced)
+                assert any(
+                    i.subset_of(p) for p in produced
+                ), f"Input {i.to_path()} not in inputs or produced!"
             for o in transform.get_outputs():
                 # assert o not in produced
-                assert all(not o.subset_of(p) for p in produced)
+                assert all(
+                    not o.subset_of(p) for p in produced
+                ), f"Output {o.to_path()} already in inputs or produced!"
                 produced.append(o)
         for o in self.outputs:
             assert o in produced, f"{o.to_path()} not in {self.outputs}"

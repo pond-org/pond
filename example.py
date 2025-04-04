@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -10,7 +8,7 @@ from pyiceberg.catalog import load_catalog
 
 from pydantic import BaseModel
 
-from pond import State, File, Field, node, pipe, index_files  # , index_defaults
+from pond import State, File, Field, node, pipe, index_files
 from pond.readers import read_npz, read_las
 from pond.writers import write_npz, write_plotly_png
 
@@ -21,7 +19,7 @@ from pond.abstract_catalog import IcebergCatalog
 
 
 class Parameters(BaseModel):
-    res: float  # = Field(default=0.5)
+    res: float
 
 
 class Point(BaseModel):
@@ -59,9 +57,8 @@ class Catalog(BaseModel):
 
 @node(Catalog, "file:cloud_files[:]", "clouds[:]")
 def parse_clouds(cloud_file: laspy.LasData) -> Cloud:
-    # cloud_file = cloud_file_file.get()
     points = [
-        Point(x=point[0], y=point[1], z=point[2]) for point in cloud_file.xyz[::10]
+        Point(x=point[0], y=point[1], z=point[2]) for point in cloud_file.xyz[::20]
     ]
     return Cloud(points=points)
 
@@ -127,18 +124,23 @@ def compute_heightmap(sums: list[np.ndarray], counts: list[np.ndarray]) -> np.nd
 
 @node(Catalog, ["params.res", "file:heightmap", "bounds"], "file:heightmap_plot")
 def plot_heightmap(res: float, heightmap: np.ndarray, bounds: Bounds) -> go.Figure:
-    fig = px.imshow(heightmap)
+    xbins = np.arange(bounds.minx + 0.5 * res, bounds.maxx, res)
+    ybins = np.arange(bounds.miny + 0.5 * res, bounds.maxy, res)
+    fig = px.imshow(
+        heightmap,
+        x=ybins,
+        y=xbins,
+        labels={"x": "Easting", "y": "Northing", "color": "Height"},
+    )
     return fig
 
 
 def prepare_pipe() -> TransformPipe:
     return pipe(
         [
-            # index_defaults(Catalog, "params"),
             index_files(Catalog, "cloud_files"),
         ],
-        # output=["params", "cloud_files"],
-        output=["cloud_files"],
+        output="cloud_files",
     )
 
 
@@ -149,11 +151,12 @@ def heightmap_pipe() -> TransformPipe:
             parse_clouds,
             compute_cloud_bounds,
             compute_bounds,
-            # compute_heightmap,
-            # plot_heightmap,
+            compute_cloud_heightmap,
+            compute_heightmap,
+            plot_heightmap,
         ],
-        # output="heightmap_plot",
-        output=["clouds", "cloud_bounds", "bounds"],
+        input="params",
+        output="heightmap_plot",
     )
 
 
@@ -162,17 +165,13 @@ def main():
     state = State(
         Catalog, catalog, storage_path="/home/nbore/Workspace/py/pypond/storage"
     )
-    state["params.res"] = 2.0
-    # state["params"] = Parameters(res=0.5)
+    state["params.res"] = 4.0
     pipeline = heightmap_pipe()
-    # for transform in pipeline.get_transforms():
-    #     for unit in transform.get_execute_units(state):
-    #         unit.execute_on(state)
-    # for unit in compute_bounds.get_execute_units(state):
-    # for unit in compute_cloud_heightmap.get_execute_units(state):
-    # for unit in compute_heightmap.get_execute_units(state):
-    for unit in plot_heightmap.get_execute_units(state):
-        unit.execute_on(state)
+    for transform in pipeline.get_transforms():
+        for unit in transform.get_execute_units(state):
+            unit.execute_on(state)
+    # for unit in plot_heightmap.get_execute_units(state):
+    #     unit.execute_on(state)
 
 
 if __name__ == "__main__":
