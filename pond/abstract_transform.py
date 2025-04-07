@@ -1,13 +1,28 @@
 from abc import ABC
-from typing import NewType, Callable
+from typing import NewType, Callable, Type
 
-from pond.lens import LensPath
+from pydantic import BaseModel
+
+from pond.lens import LensPath, LensInfo
 from pond.state import State
 
 AbstractExecuteTransform = NewType("AbstractExecuteTransform", None)
 
 
 class AbstractTransform(ABC):
+    
+    def get_input_types(self, root_type: Type[BaseModel]) -> dict[str, Type]:
+        return [LensInfo(root_type, p).get_type() for p in self.get_inputs()]
+
+    def get_output_type(self, root_type: Type[BaseModel]) -> Type:
+        outputs = [LensInfo(root_type, p).get_type() for p in self.get_outputs()]
+        if len(outputs) == 0:
+            return None
+        elif len(outputs) == 1:
+            return outputs[0]
+        else:
+            return tuple[*outputs]
+
     def get_inputs(self) -> list[LensPath]:
         pass
 
@@ -61,5 +76,8 @@ class ExecuteTransform(AbstractExecuteUnit):
 
 
 class AbstractExecuteTransform(AbstractTransform):
+    def get_name(self) -> str:
+        pass
+
     def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:
         pass

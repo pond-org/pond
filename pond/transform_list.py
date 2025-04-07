@@ -53,13 +53,13 @@ class TransformList(AbstractExecuteTransform):
                     i.count("[:]") == 1
                 ), "List transforms can only iterate over one expansion"
                 replace_element = i.find("[:]") + 1
-                lens = LensInfo(Catalog, i[: replace_element - 1])
+                lens = LensInfo.from_path(Catalog, i[: replace_element - 1])
                 index = len(lens.lens_path.path) - 1
-                input_lens = LensInfo(
+                input_lens = LensInfo.from_path(
                     Catalog, i[:replace_element] + "0" + i[replace_element + 1 :]
                 )
             else:
-                lens = LensInfo(Catalog, i)
+                lens = LensInfo.from_path(Catalog, i)
                 index = -1
                 input_lens = None
             try:
@@ -83,14 +83,14 @@ class TransformList(AbstractExecuteTransform):
                     "[:]"
                 ), "pond does not yet allow iterating over children for outputs"
                 replace_element = len(o) - 2
-                lens = LensInfo(Catalog, o[: replace_element - 1])
+                lens = LensInfo.from_path(Catalog, o[: replace_element - 1])
                 index = len(lens.lens_path.path) - 1
-                output_lens = LensInfo(
+                output_lens = LensInfo.from_path(
                     Catalog, o[:replace_element] + "0" + o[replace_element + 1 :]
                 )
                 found = True
             else:
-                lens = LensInfo(Catalog, o)
+                lens = LensInfo.from_path(Catalog, o)
                 index = -1
                 output_lens = None
             try:
@@ -106,6 +106,9 @@ class TransformList(AbstractExecuteTransform):
                 warnings.warn(str(m))
             self.output_lenses[o] = (lens, index, output_lens)
         assert found, "Node output must have at least one list output with list inputs"
+
+    def get_name(self) -> str:
+        return self.fn.__name__
 
     def get_inputs(self) -> list[LensPath]:
         return [i[0].lens_path for i in self.input_lenses.values()]

@@ -100,11 +100,19 @@ class LensInfo:
     def __init__(
         self,
         root_type: Type[BaseModel],
+        lens_path: LensPath,
+    ):
+        self.lens_path = lens_path
+        self.type, self.extra_args = get_tree_type(self.lens_path.path[1:], root_type)
+
+    @staticmethod
+    def from_path(
+        root_type: Type[BaseModel],
         path: str,
         root_path: str = "catalog",
-    ):
-        self.lens_path = get_cleaned_path(path, root_path)
-        self.type, self.extra_args = get_tree_type(self.lens_path.path[1:], root_type)
+    ) -> "LensInfo":
+        lens_path = get_cleaned_path(path, root_path)
+        return LensInfo(root_type, lens_path)
 
     def set_index(self, index: int, value: int):
         assert index >= 0
@@ -142,7 +150,7 @@ class Lens(LensInfo):
         root_path: str = "catalog",
         storage_path: str = ".",
     ):
-        super().__init__(root_type, path, root_path)
+        super().__init__(root_type, get_cleaned_path(path, root_path))
         self.catalog = catalog
         self.storage_path = storage_path
         self.fs = LocalFileSystem(auto_mkdir=True)

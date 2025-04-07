@@ -57,9 +57,12 @@ class TransformIndex(AbstractExecuteTransform):
         paths = path if isinstance(path, list) else [path]
         self.outputs = []
         for p in paths:
-            lens_info = LensInfo(Catalog, p)
+            lens_info = LensInfo.from_path(Catalog, p)
             file_paths = get_file_paths(lens_info.lens_path.path, lens_info.type)
             self.outputs.extend(file_paths)
+
+    def get_name(self) -> str:
+        return "index_" + "+".join(o.to_path() for o in self.outputs)
 
     def get_inputs(self) -> list[LensPath]:
         return []

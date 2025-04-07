@@ -31,8 +31,12 @@ class Transform(AbstractExecuteTransform):
         self.fn = fn
         inputs = input if isinstance(input, list) else [input]
         outputs = output if isinstance(output, list) else [output]
-        self.input_lenses = OrderedDict((i, LensInfo(Catalog, i)) for i in inputs)
-        self.output_lenses = OrderedDict((o, LensInfo(Catalog, o)) for o in outputs)
+        self.input_lenses = OrderedDict(
+            (i, LensInfo.from_path(Catalog, i)) for i in inputs
+        )
+        self.output_lenses = OrderedDict(
+            (o, LensInfo.from_path(Catalog, o)) for o in outputs
+        )
         types = get_type_hints(self.fn)
         try:
             output_types = types.pop("return")
@@ -71,6 +75,9 @@ class Transform(AbstractExecuteTransform):
                 print(f"{output_lens.get_type()} checks with {output_type}!")
             except BeartypeDoorNonpepException as m:
                 warnings.warn(str(m))
+
+    def get_name(self) -> str:
+        return self.fn.__name__
 
     def get_inputs(self) -> list[LensPath]:
         return [i.lens_path for i in self.input_lenses.values()]
