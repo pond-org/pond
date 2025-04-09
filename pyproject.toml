@@ -17,4 +17,5 @@ dependencies = [
     "pydantic-to-pyarrow>=0.1.5",
     "pyiceberg[pyarrow,s3fs,sql-sqlite]>=0.8.1",
     "pytest>=8.3.4",
+    "sf-hamilton[sdk,ui]>=1.88.0",
 ]

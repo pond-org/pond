@@ -64,6 +64,14 @@ class TransformIndex(AbstractExecuteTransform):
     def get_name(self) -> str:
         return "index_" + "+".join(o.to_path() for o in self.outputs)
 
+    def get_docs(self) -> str:
+        return "Index files in folders " + ", ".join(
+            o.to_volume_path() for o in self.outputs
+        )
+
+    def get_fn(self) -> Callable:
+        return ExecuteIndex.execute_on
+
     def get_inputs(self) -> list[LensPath]:
         return []
 

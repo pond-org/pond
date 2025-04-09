@@ -14,6 +14,7 @@ from pond.writers import write_npz, write_plotly_png
 
 from pond.transform_pipe import TransformPipe
 from pond.abstract_catalog import IcebergCatalog
+from pond.ui import UIClient
 
 # os.environ["PYICEBERG_HOME"] = os.getcwd()
 
@@ -167,9 +168,26 @@ def main():
     )
     state["params.res"] = 4.0
     pipeline = heightmap_pipe()
-    for transform in pipeline.get_transforms():
-        for unit in transform.get_execute_units(state):
-            unit.execute_on(state)
+    ui_client = UIClient(1, "nils", "pond", Catalog)
+    transforms = pipeline.get_transforms()
+    ui_client.post_graph_construct(transforms)
+    ui_client.pre_graph_execute("test", transforms, [], [])
+    error = None
+    success = True
+    result = None
+    for transform in transforms:
+        ui_client.pre_node_execute("test", transform)
+        try:
+            for unit in transform.get_execute_units(state):
+                unit.execute_on(state)
+        except Exception as e:
+            error = e
+            success = False
+
+        ui_client.post_node_execute("test", transform, success, error, result)
+        if error is not None:
+            break
+    ui_client.post_graph_execute("test", transforms, success, error)
     # for unit in plot_heightmap.get_execute_units(state):
     #     unit.execute_on(state)
 

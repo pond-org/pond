@@ -79,6 +79,12 @@ class Transform(AbstractExecuteTransform):
     def get_name(self) -> str:
         return self.fn.__name__
 
+    def get_docs(self) -> str:
+        return self.fn.__doc__
+
+    def get_fn(self) -> Callable:
+        return self.fn
+
     def get_inputs(self) -> list[LensPath]:
         return [i.lens_path for i in self.input_lenses.values()]
 

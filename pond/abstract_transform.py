@@ -79,5 +79,11 @@ class AbstractExecuteTransform(AbstractTransform):
     def get_name(self) -> str:
         pass
 
+    def get_docs(self) -> str:
+        pass
+
+    def get_fn(self) -> Callable:
+        pass
+
     def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:
         pass
