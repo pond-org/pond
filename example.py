@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -14,7 +15,7 @@ from pond.writers import write_npz, write_plotly_png
 
 from pond.transform_pipe import TransformPipe
 from pond.abstract_catalog import IcebergCatalog
-from pond.ui import UIClient
+from pond.ui_hook import UIHook
 
 # os.environ["PYICEBERG_HOME"] = os.getcwd()
 
@@ -163,20 +164,19 @@ def heightmap_pipe() -> TransformPipe:
 
 def main():
     catalog = IcebergCatalog(load_catalog(name="default"))
-    state = State(
-        Catalog, catalog, storage_path="/home/nbore/Workspace/py/pypond/storage"
-    )
+    state = State(Catalog, catalog, storage_path=os.path.join(os.getcwd(), "storage"))
     state["params.res"] = 4.0
     pipeline = heightmap_pipe()
-    ui_client = UIClient(1, "nils", "pond", Catalog)
+    ui_client = UIHook(1, "nils", "pond")
+    ui_client.initialize(Catalog)
     transforms = pipeline.get_transforms()
-    ui_client.post_graph_construct(transforms)
-    ui_client.pre_graph_execute("test", transforms, [], [])
+    # ui_client.post_graph_construct(transforms)
+    ui_client.pre_pipe_execute(pipeline)
     error = None
     success = True
-    result = None
+    # result = None
     for transform in transforms:
-        ui_client.pre_node_execute("test", transform)
+        ui_client.pre_node_execute(transform)
         try:
             for unit in transform.get_execute_units(state):
                 unit.execute_on(state)
@@ -184,10 +184,10 @@ def main():
             error = e
             success = False
 
-        ui_client.post_node_execute("test", transform, success, error, result)
+        ui_client.post_node_execute(transform, success, error)
         if error is not None:
             break
-    ui_client.post_graph_execute("test", transforms, success, error)
+    ui_client.post_pipe_execute(pipeline, success, error)
     # for unit in plot_heightmap.get_execute_units(state):
     #     unit.execute_on(state)
 

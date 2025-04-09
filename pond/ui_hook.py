@@ -26,8 +26,11 @@ from hamilton_sdk.api.projecttypes import GitInfo
 from hamilton_sdk.tracking.trackingtypes import TaskRun
 from hamilton_sdk.tracking.data_observation import ObservationType
 
-from pond.lens import LensPath
+from pond.lens import LensPath, LensInfo
 from pond.abstract_transform import AbstractExecuteTransform
+from pond.transform_pipe import TransformPipe
+from pond.transform_index import TransformIndex
+from pond.hooks import BaseHook
 
 
 LONG_SCALE = float(0xFFFFFFFFFFFFFFF)
@@ -70,7 +73,10 @@ def _convert_classifications(transform: AbstractExecuteTransform) -> list[str]:
     #     out.append("input")
     # else:
     #     out.append("transform")
-    out.append("transform")
+    if isinstance(transform, TransformIndex):
+        out.append("data_loader")
+    else:
+        out.append("transform")
     return out
 
 
@@ -103,6 +109,7 @@ def _extract_node_templates_from_function_graph(
     root_type: Type[BaseModel],
     transforms: list[AbstractExecuteTransform],
     dependencies: dict[str, set[str]],
+    inputs: dict[str, Type],
 ) -> list[dict]:
     """Converts a function graph to a list of nodes that the DAGWorks graph can understand.
 
@@ -128,6 +135,23 @@ def _extract_node_templates_from_function_graph(
                 **_convert_node_dependencies(
                     root_type, transform, transform_dict, dependencies[name]
                 ),
+            )
+        )
+    for input_name, input_type in inputs.items():
+        node_templates.append(
+            dict(
+                name=input_name,
+                output={"type_name": str(input_type)},
+                output_type="python_type",
+                output_schema_version=1,  # TODO -- merge this with _convert_node_dependencies
+                documentation="User provided input",
+                tags={},  # node_.tags,  # TODO -- ensure serializable
+                classifications=["input"],
+                code_artifact_pointers=[],
+                dependencies=[],
+                dependency_specs=[],
+                dependency_specs_type="python_type",
+                dependency_specs_schema_version=1,
             )
         )
     return node_templates
@@ -345,18 +369,19 @@ def process_result(
     return statistics, schema, additional
 
 
-class UIClient:
+class UIHook(BaseHook):
     def __init__(
         self,
         project_id: int,
         username: str,
         dag_name: str,
-        root_type: Type[BaseModel],
+        # root_type: Type[BaseModel],
         tags: dict[str, str] = None,
         api_key: str = None,
         hamilton_api_url="http://localhost:8241",
         hamilton_ui_url="http://localhost:8241",
         verify: Union[str, bool] = True,
+        run_id: str = "dev",
     ):
         """This hooks into Hamilton execution to track DAG runs in Hamilton UI.
 
@@ -373,7 +398,8 @@ class UIClient:
         self.project_id = project_id
         self.api_key = api_key
         self.username = username
-        self.root_type = root_type
+        self.run_id = run_id
+        # self.root_type = root_type
         self.client = BasicSynchronousHamiltonClient(
             api_key, username, hamilton_api_url, verify=verify
         )
@@ -419,10 +445,8 @@ class UIClient:
 
     def post_graph_construct(
         self,
-        # graph: h_graph.FunctionGraph,
         transforms: list[AbstractExecuteTransform],
-        # modules: list[ModuleType],
-        # config: dict[str, Any],
+        inputs: dict[str, Type],
     ):
         """Registers the DAG to get an ID."""
         if self.seed is None:
@@ -443,7 +467,7 @@ class UIClient:
         )  # driver.hash_dag_modules(graph, modules)
 
         nodes = _extract_node_templates_from_function_graph(
-            self.root_type, transforms, self.dependencies
+            self.root_type, transforms, self.dependencies, inputs
         )
         print("Nodes: ", nodes)
 
@@ -466,15 +490,20 @@ class UIClient:
         )
         self.dag_template_id_cache[fg_id] = dag_template_id
 
-    def pre_graph_execute(
+    def pre_pipe_execute(
         self,
-        run_id: str,
-        transforms: list[AbstractExecuteTransform],
-        final_vars: list[str],
-        inputs: dict[str, Any],
+        pipe: TransformPipe,
     ):
         """Creates a DAG run."""
-        logger.debug("pre_graph_execute %s", run_id)
+        logger.debug("pre_graph_execute %s", self.run_id)
+        transforms = pipe.get_transforms()
+        inputs = {
+            i.to_path(): LensInfo(self.root_type, i).get_type()
+            for i in pipe.get_inputs()
+        }
+        self.post_graph_construct(transforms, inputs)
+        final_vars: list[str] = []
+
         fg_id = id(transforms)
         if fg_id in self.dag_template_id_cache:
             dag_template_id = self.dag_template_id_cache[fg_id]
@@ -482,8 +511,8 @@ class UIClient:
             raise ValueError(
                 "DAG template ID not found in cache. This should never happen."
             )
-        tracking_state = TrackingState(run_id)
-        self.tracking_states[run_id] = tracking_state  # cache
+        tracking_state = TrackingState(self.run_id)
+        self.tracking_states[self.run_id] = tracking_state  # cache
         tracking_state.clock_start()
         dw_run_id = self.client.create_and_start_dag_run(
             dag_template_id=dag_template_id,
@@ -491,8 +520,8 @@ class UIClient:
             inputs=inputs if inputs is not None else {},
             outputs=final_vars,
         )
-        self.dw_run_ids[run_id] = dw_run_id
-        self.task_runs[run_id] = {}
+        self.dw_run_ids[self.run_id] = dw_run_id
+        self.task_runs[self.run_id] = {}
         logger.warning(
             f"\nCapturing execution run. Results can be found at "
             f"{self.hamilton_ui_url}/dashboard/project/{self.project_id}/runs/{dw_run_id}\n"
@@ -501,14 +530,14 @@ class UIClient:
 
     def pre_node_execute(
         self,
-        run_id: str,
         transform: AbstractExecuteTransform,
         # kwargs: dict[str, Any],
-        task_id: Optional[str] = None,
+        # task_id: Optional[str] = None,
     ):
         """Captures start of node execution."""
-        logger.debug("pre_node_execute %s %s", run_id, task_id)
-        tracking_state = self.tracking_states[run_id]
+        task_id = None
+        logger.debug("pre_node_execute %s %s", self.run_id, task_id)
+        tracking_state = self.tracking_states[self.run_id]
         if tracking_state.status == Status.UNINITIALIZED:  # not thread safe?
             tracking_state.update_status(Status.RUNNING)
 
@@ -518,7 +547,7 @@ class UIClient:
         task_run.status = Status.RUNNING
         task_run.start_time = datetime.datetime.now(timezone.utc)
         tracking_state.update_task(name, task_run)
-        self.task_runs[run_id][name] = task_run
+        self.task_runs[self.run_id][name] = task_run
 
         task_update = dict(
             node_template_name=name,
@@ -530,7 +559,7 @@ class UIClient:
         )
         # we need a 1-1 mapping of updates for the sample stuff to work.
         self.client.update_tasks(
-            self.dw_run_ids[run_id],
+            self.dw_run_ids[self.run_id],
             attributes=[None],
             task_updates=[task_update],
             in_samples=[task_run.is_in_sample],
@@ -585,19 +614,19 @@ class UIClient:
 
     def post_node_execute(
         self,
-        run_id: str,
         transform: AbstractExecuteTransform,
         # kwargs: dict[str, Any],
         success: bool,
         error: Optional[Exception],
-        result_type: Optional[Type],
-        task_id: Optional[str] = None,
+        # result_type: Optional[Type],
+        # task_id: Optional[str] = None,
     ):
         """Captures end of node execution."""
-        logger.debug("post_node_execute %s %s", run_id, task_id)
+        task_id = None
+        logger.debug("post_node_execute %s %s", self.run_id, task_id)
         name = transform.get_name()
-        task_run: TaskRun = self.task_runs[run_id][name]
-        tracking_state = self.tracking_states[run_id]
+        task_run: TaskRun = self.task_runs[self.run_id][name]
+        tracking_state = self.tracking_states[self.run_id]
         task_run.end_time = datetime.datetime.now(timezone.utc)
 
         other_results = []
@@ -680,23 +709,22 @@ class UIClient:
             end_time=task_run.end_time,
         )
         self.client.update_tasks(
-            self.dw_run_ids[run_id],
+            self.dw_run_ids[self.run_id],
             attributes=attributes,
             task_updates=[task_update for _ in attributes],
             in_samples=[task_run.is_in_sample for _ in attributes],
         )
 
-    def post_graph_execute(
+    def post_pipe_execute(
         self,
-        run_id: str,
-        transforms: list[AbstractExecuteTransform],
+        pipe: TransformPipe,
         success: bool,
         error: Optional[Exception],
     ):
         """Captures end of DAG execution."""
-        logger.debug("post_graph_execute %s", run_id)
-        dw_run_id = self.dw_run_ids[run_id]
-        tracking_state = self.tracking_states[run_id]
+        logger.debug("post_graph_execute %s", self.run_id)
+        dw_run_id = self.dw_run_ids[self.run_id]
+        tracking_state = self.tracking_states[self.run_id]
         tracking_state.clock_end(status=Status.SUCCESS if success else Status.FAILURE)
         finally_block_time = datetime.datetime.utcnow()
         if tracking_state.status != Status.SUCCESS:
