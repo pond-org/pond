@@ -75,7 +75,7 @@ def get_tree_type(
     return type, extra_args
 
 
-def get_cleaned_path(path: str, root_path: str) -> tuple[str, LensPath]:
+def get_cleaned_path(path: str, root_path: str) -> LensPath:
     if matches := parse("{:l}:{}", path):
         variant, path = matches
     else:

@@ -26,7 +26,7 @@ from hamilton_sdk.api.projecttypes import GitInfo
 from hamilton_sdk.tracking.trackingtypes import TaskRun
 from hamilton_sdk.tracking.data_observation import ObservationType
 
-from pond.lens import LensPath, LensInfo
+from pond.lens import LensPath, LensInfo, get_cleaned_path
 from pond.abstract_transform import AbstractExecuteTransform
 from pond.transform_pipe import TransformPipe
 from pond.transform_index import TransformIndex
@@ -92,9 +92,16 @@ def _convert_node_dependencies(
     dependency_specs_schema_version = 1
     for dep in deps:
         dependencies.append(dep)
-        dependency_specs.append(
-            {"type_name": str(transform_dict[dep].get_output_type(root_type))}
-        )
+        if dep in transform_dict:
+            # Dep is a transform
+            dependency_specs.append(
+                {"type_name": str(transform_dict[dep].get_output_type(root_type))}
+            )
+        else:
+            # Dep is an input
+            dependency_specs.append(
+                {"type_name": str(LensInfo.from_path(root_type, dep).get_type())}
+            )
 
     return {
         "dependencies": dependencies,
@@ -343,6 +350,7 @@ def add_dependency(
 
 def compute_dependencies(
     transforms: list[AbstractExecuteTransform],
+    inputs: dict[str, Type],
 ) -> dict[str, set[str]]:
     dependencies: dict[str, set[str]] = {}
     for transform in transforms:
@@ -350,6 +358,10 @@ def compute_dependencies(
         dependencies[name] = set()
         for i in transform.get_inputs():
             add_dependency(name, i, transforms, dependencies)
+            for input_name in inputs.keys():
+                p = get_cleaned_path(input_name, "catalog")
+                if i.subset_of(p):
+                    dependencies[name].add(input_name)
     return dependencies
 
 
@@ -452,7 +464,7 @@ class UIHook(BaseHook):
         if self.seed is None:
             self.seed = random.random()
         logger.debug("post_graph_construct")
-        self.dependencies = compute_dependencies(transforms)
+        self.dependencies = compute_dependencies(transforms, inputs)
         print(self.dependencies)
         fg_id = id(transforms)
         if fg_id in self.dag_template_id_cache:
