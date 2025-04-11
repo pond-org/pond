@@ -248,6 +248,60 @@ def extract_code_artifacts_from_function_graph(
     return out
 
 
+def extract_code_artifacts_from_inputs(
+    inputs: dict[str, Type], vcs_info: GitInfo, repo_base_path: str
+) -> list[dict]:
+    """Converts a function graph to a list of code artifacts that the function graph uses.
+
+    @param fn_graph: Function graph to convert.
+    @return: A list of node objects.
+    """
+    seen = set()
+    out = []
+    for input_name, input_type in inputs.items():
+        class_name = _get_fully_qualified_function_path(input_type)
+        if class_name not in seen:
+            seen.add(class_name)
+            # need to handle decorators -- they will return the wrong sourcefile.
+            try:
+                source_file = inspect.getsourcefile(input_type)
+            except TypeError:
+                # Happens e.g. for built-in types
+                continue
+            if source_file is not None:
+                path = os.path.relpath(source_file, repo_base_path)
+            else:
+                path = ""
+            try:
+                source_lines = inspect.getsourcelines(input_type)
+                out.append(
+                    dict(
+                        name=class_name,
+                        type="p_class",
+                        path=path,
+                        start=inspect.getsourcelines(input_type)[1] - 1,
+                        end=inspect.getsourcelines(input_type)[1]
+                        - 1
+                        + len(source_lines[0]),
+                        url=_derive_url(vcs_info, path, source_lines[1]),
+                    )
+                )
+            except OSError:
+                # This is an error state where somehow we don't have
+                # source code.
+                out.append(
+                    dict(
+                        name=class_name,
+                        type="p_class",
+                        path=path,
+                        start=0,
+                        end=0,
+                        url=_derive_url(vcs_info, path, 0),
+                    )
+                )
+    return out
+
+
 def _slurp_code(
     transforms: list[AbstractExecuteTransform], repo_base: str
 ) -> list[dict]:
@@ -481,12 +535,14 @@ class UIHook(BaseHook):
         nodes = _extract_node_templates_from_function_graph(
             self.root_type, transforms, self.dependencies, inputs
         )
-        print("Nodes: ", nodes)
 
         code_artifacts = extract_code_artifacts_from_function_graph(
             transforms, vcs_info, vcs_info.local_repo_base_path
         )
-        print("CODE: ", code_artifacts)
+        input_artifacts = extract_code_artifacts_from_inputs(
+            inputs, vcs_info, vcs_info.local_repo_base_path
+        )
+        # raise ValueError("BREAK")
 
         dag_template_id = self.client.register_dag_template_if_not_exists(
             project_id=self.project_id,
@@ -494,7 +550,7 @@ class UIHook(BaseHook):
             code_hash=code_hash,
             name=self.dag_name,
             nodes=nodes,
-            code_artifacts=code_artifacts,
+            code_artifacts=code_artifacts + input_artifacts,
             config={},  # graph.config,
             tags=self.base_tags,
             code=_slurp_code(transforms, vcs_info.local_repo_base_path),
@@ -538,7 +594,7 @@ class UIHook(BaseHook):
             f"\nCapturing execution run. Results can be found at "
             f"{self.hamilton_ui_url}/dashboard/project/{self.project_id}/runs/{dw_run_id}\n"
         )
-        return dw_run_id
+        # return dw_run_id
 
     def pre_node_execute(
         self,
