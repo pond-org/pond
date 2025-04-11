@@ -1,6 +1,7 @@
 import os
-from types import ModuleType
-from typing import Any, Callable, Union, Optional, Type
+
+# from types import ModuleType
+from typing import Union, Optional, Type
 import datetime
 from datetime import timezone
 import random
@@ -11,20 +12,22 @@ import hashlib
 from loguru import logger
 from pydantic import BaseModel
 
-try:
-    import git
-except ImportError:
-    git = None
-
 from hamilton_sdk.api.clients import (
     BasicSynchronousHamiltonClient,
     UnauthorizedException,
     ResourceDoesNotExistException,
 )
-from hamilton_sdk.tracking.runs import Status, TrackingState
 from hamilton_sdk.api.projecttypes import GitInfo
+from hamilton_sdk.tracking.runs import Status, TrackingState
 from hamilton_sdk.tracking.trackingtypes import TaskRun
 from hamilton_sdk.tracking.data_observation import ObservationType
+
+from hamilton_sdk.driver import (
+    validate_tags,
+    _get_fully_qualified_function_path,
+    _derive_url,
+    _derive_version_control_info,
+)
 
 from pond.lens import LensPath, LensInfo, get_cleaned_path
 from pond.abstract_transform import AbstractExecuteTransform
@@ -32,32 +35,11 @@ from pond.transform_pipe import TransformPipe
 from pond.transform_index import TransformIndex
 from pond.hooks import BaseHook
 
-
 LONG_SCALE = float(0xFFFFFFFFFFFFFFF)
 
 
 def get_node_name(name: str, task_id: Optional[str]) -> str:
     return name if task_id is None else f"{task_id}-{name}"
-
-
-def validate_tags(tags: Any):
-    """Validates that tags are a dictionary of strings to strings.
-
-    :param tags: Tags to validate
-    :raises ValueError: If tags are not a dictionary of strings to strings
-    """
-    if not isinstance(tags, dict):
-        raise ValueError(f"Tags must be a dictionary, but got {tags}")
-    for key, value in tags.items():
-        if not isinstance(key, str):
-            raise ValueError(f"Tag keys must be strings, but got {key}")
-        if not isinstance(value, str):
-            raise ValueError(f"Tag values must be strings, but got {value}")
-
-
-# def _generate_unique_temp_module_name() -> str:
-#     """Generates a unique module name that is a valid python variable."""
-#     return f"temporary_module_{str(uuid.uuid4()).replace('-', '_')}"
 
 
 def _convert_classifications(transform: AbstractExecuteTransform) -> list[str]:
@@ -162,36 +144,6 @@ def _extract_node_templates_from_function_graph(
             )
         )
     return node_templates
-
-
-def _get_fully_qualified_function_path(fn: Callable) -> str:
-    """Gets the fully qualified path of a function.
-
-    :param fn: Function to get the path of
-    :return: Fully qualified path of the function
-    """
-    module = inspect.getmodule(fn)
-    fn_name = fn.__name__
-    if module is not None:
-        fn_name = f"{module.__name__}.{fn_name}"
-    return fn_name
-
-
-def _derive_url(vcs_info: GitInfo, path: str, line: int) -> str:
-    """Derives a URL from a VCS info, a path, and a line number.
-
-    @param vcs_info: VCS info
-    @param path: Path
-    @param line: Line number
-    @return: A URL
-    """
-    if vcs_info.repository == "Error: No repository to link to.":
-        return "Error: No repository to link to."
-    if vcs_info.repository.endswith(".git"):
-        repo_url = vcs_info.repository[:-4]
-    else:
-        repo_url = vcs_info.repository
-    return f"{repo_url}/blob/{vcs_info.commit_hash}/{path}#L{line}"
 
 
 def extract_code_artifacts_from_function_graph(
@@ -316,75 +268,6 @@ def _slurp_code(
             with open(module.__file__, "r") as f:
                 out.append({"path": module_path, "contents": f.read()})
     return out
-
-
-def _derive_version_control_info(module_hash: str) -> GitInfo:
-    """Derive the git info for the current project.
-    Currently, this decides whether we're in a git repository.
-    This is not going to work for everything, but we'll see what the customers want.
-    We might end up having to pass this data in...
-    """
-    default = GitInfo(
-        branch="unknown",
-        commit_hash=module_hash,
-        committed=False,
-        repository="Error: No repository to link to.",
-        local_repo_base_path=os.getcwd(),
-    )
-    if git is None:
-        return default
-    try:
-        repo = git.Repo(".", search_parent_directories=True)
-    except git.exc.InvalidGitRepositoryError:
-        logger.warning(
-            "Warning: We are not currently in a git repository. We recommend using that as a "
-            "way to version the "
-            "project *if* your hamilton code lives within this repository too. If it does not,"
-            " then we'll try to "
-            "version code based on the python modules passed to the Driver. "
-            "Incase you want to get set up with git quickly you can run:\n "
-            "git init && git add . && git commit -m 'Initial commit'\n"
-            "Still have questions? Reach out to stefan @ dagworks.io, elijah @ dagworks.io "
-            "and we'll try to help you as soon as possible."
-        )
-        return default
-    if "COLAB_RELEASE_TAG" in os.environ:
-        logger.warning(
-            "We currently do not support logging version information inside a google"
-            "colab notebook. This is something we are planning to do. "
-            "If you have any questions, please reach out to support@dagworks.io"
-            "and we'll try to help you as soon as possible."
-        )
-        return default
-
-    try:
-        commit = repo.head.commit
-    except Exception:
-        return default
-    try:
-        repo_url = repo.remote().url
-    except Exception:
-        # TODO: change this to point to our docs on what to do.
-        repo_url = "Error: No repository to link to."
-    try:
-        branch_name = repo.active_branch.name
-    except Exception:
-        branch_name = "unknown"  # detached head
-        logger.warning(
-            "Warning: we are unable to determine the branch name. "
-            "This is likely because you are in a detached head state. "
-            "If you are in a detached head state, you can check out a "
-            "branch by running `git checkout -b <branch_name>`. "
-            "If you intend to be (if you are using some sort of CI"
-            "system that checks out a detached head) then you can ignore this."
-        )
-    return GitInfo(
-        branch=branch_name,
-        commit_hash=commit.hexsha,
-        committed=not repo.is_dirty(),
-        repository=repo_url,
-        local_repo_base_path=repo.working_dir,
-    )
 
 
 def add_dependency(
