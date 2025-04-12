@@ -9,7 +9,10 @@ from pydantic._internal import _generics
 from pond.state import State
 from pond.lens import LensInfo, LensPath, TypeField
 from pond.field import File
-from pond.abstract_transform import AbstractExecuteTransform, AbstractExecuteUnit
+from pond.transforms.abstract_transform import (
+    AbstractExecuteTransform,
+    AbstractExecuteUnit,
+)
 
 
 def get_file_paths(path: list[TypeField], model_type: Type) -> list[LensPath]:

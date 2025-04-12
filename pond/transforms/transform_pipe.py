@@ -1,5 +1,8 @@
 from pond.lens import LensPath, get_cleaned_path
-from pond.abstract_transform import AbstractTransform, AbstractExecuteTransform
+from pond.transforms.abstract_transform import (
+    AbstractTransform,
+    AbstractExecuteTransform,
+)
 
 # from pond.transform import Transform
 
