@@ -33,7 +33,7 @@ from pond.lens import LensPath, LensInfo, get_cleaned_path
 from pond.abstract_transform import AbstractExecuteTransform
 from pond.transform_pipe import TransformPipe
 from pond.transform_index import TransformIndex
-from pond.hooks import BaseHook
+from pond.hooks.abstract_hook import AbstractHook
 
 LONG_SCALE = float(0xFFFFFFFFFFFFFFF)
 
@@ -318,7 +318,7 @@ def process_result(
     return statistics, schema, additional
 
 
-class UIHook(BaseHook):
+class UIHook(AbstractHook):
     def __init__(
         self,
         project_id: int,

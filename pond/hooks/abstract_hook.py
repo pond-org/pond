@@ -7,7 +7,7 @@ from pond.abstract_transform import AbstractExecuteTransform
 from pond.transform_pipe import TransformPipe
 
 
-class BaseHook(ABC):
+class AbstractHook(ABC):
     def __init__(self):
         self.root_type = None
 
