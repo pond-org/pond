@@ -2,8 +2,8 @@ import pytest
 
 from pond.lens import Lens
 from pond.state import State
-from pond.transform import Transform
-from pond.transform_pipe import TransformPipe
+from pond.transforms.transform import Transform
+from pond.transforms.transform_pipe import TransformPipe
 from conf.catalog import Catalog, Drive, Navigation
 
 from tests.test_utils import (

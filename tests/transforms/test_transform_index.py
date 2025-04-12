@@ -1,8 +1,8 @@
 import pytest
 
 from pond import State
-from pond.abstract_catalog import LensPath
-from pond.transform_index import TransformIndex
+from pond.catalogs.abstract_catalog import LensPath
+from pond.transforms.transform_index import TransformIndex
 
 from tests.test_utils import (
     empty_iceberg_catalog,

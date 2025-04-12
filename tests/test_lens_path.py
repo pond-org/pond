@@ -1,7 +1,4 @@
-from pond.abstract_catalog import (
-    # TypeField,
-    LensPath,
-)
+from pond.catalogs.abstract_catalog import LensPath
 
 
 def test_lens_path():

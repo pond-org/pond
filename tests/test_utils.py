@@ -5,7 +5,8 @@ import pyarrow as pa
 from pyiceberg.catalog.sql import SqlCatalog
 import lance
 
-from pond.abstract_catalog import LanceCatalog, IcebergCatalog
+from pond.catalogs.lance_catalog import LanceCatalog
+from pond.catalogs.iceberg_catalog import IcebergCatalog
 import pond.lens
 
 from conf.catalog import Catalog, Drive, Navigation, Values

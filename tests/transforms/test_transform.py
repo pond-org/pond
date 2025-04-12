@@ -1,12 +1,9 @@
 # import pond
 
-import os
 from typing import Any
-from functools import partial
 
 import pytest
 
-from pond.abstract_catalog import LanceCatalog
 from pond import Lens, Transform, State
 from tests.test_utils import (
     catalog,
@@ -16,7 +13,7 @@ from tests.test_utils import (
     empty_lance_catalog,
 )
 
-from conf.catalog import Catalog, Drive, Navigation, Values
+from conf.catalog import Catalog, Drive, Navigation
 
 
 def value1_value2(value1: float) -> int:
