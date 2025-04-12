@@ -6,15 +6,11 @@ from pydantic import BaseModel
 from PIL import Image
 
 from pond.field import File, Field
+from pond.io.readers import read_image, read_pickle
+from pond.io.writers import write_image, write_pickle
 
 from conf.catalog import Navigation, Values
-from conf.file_catalog import (
-    FileDrive,
-    read_image,
-    write_image,
-    read_pickle,
-    write_pickle,
-)
+from conf.file_catalog import FileDrive
 
 
 class FileCatalog(BaseModel):
