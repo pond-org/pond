@@ -3,8 +3,8 @@ from typing import Type, Optional
 
 from pydantic import BaseModel
 
-from pond.abstract_transform import AbstractExecuteTransform
-from pond.transform_pipe import TransformPipe
+from pond.transforms.abstract_transform import AbstractExecuteTransform
+from pond.transforms.transform_pipe import TransformPipe
 
 
 class AbstractHook(ABC):

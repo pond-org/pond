@@ -30,9 +30,9 @@ from hamilton_sdk.driver import (
 )
 
 from pond.lens import LensPath, LensInfo, get_cleaned_path
-from pond.abstract_transform import AbstractExecuteTransform
-from pond.transform_pipe import TransformPipe
-from pond.transform_index import TransformIndex
+from pond.transforms.abstract_transform import AbstractExecuteTransform
+from pond.transforms.transform_pipe import TransformPipe
+from pond.transforms.transform_index import TransformIndex
 from pond.hooks.abstract_hook import AbstractHook
 
 LONG_SCALE = float(0xFFFFFFFFFFFFFFF)

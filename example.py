@@ -10,12 +10,12 @@ from pyiceberg.catalog import load_catalog
 from pydantic import BaseModel
 
 from pond import State, File, Field, node, pipe, index_files
-from pond.readers import read_npz, read_las
-from pond.writers import write_npz, write_plotly_png
+from pond.io.readers import read_npz, read_las
+from pond.io.writers import write_npz, write_plotly_png
 
-from pond.transform_pipe import TransformPipe
-from pond.abstract_catalog import IcebergCatalog
-from pond.ui_hook import UIHook
+from pond.transforms.transform_pipe import TransformPipe
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.hooks.ui_hook import UIHook
 
 # os.environ["PYICEBERG_HOME"] = os.getcwd()
 
