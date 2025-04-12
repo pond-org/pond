@@ -1,4 +1,3 @@
-import os
 from typing import List, Type, Any, get_args, get_origin
 
 import datetime
@@ -10,7 +9,7 @@ import pydantic_to_pyarrow
 from pydantic._internal import _generics
 import pyarrow as pa
 
-from pond.abstract_catalog import (
+from pond.catalogs.abstract_catalog import (
     TypeField,
     LensPath,
     AbstractCatalog,

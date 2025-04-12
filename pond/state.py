@@ -2,7 +2,7 @@ from typing import Type, Any
 
 from pydantic import BaseModel
 from pond.lens import Lens
-from pond.abstract_catalog import AbstractCatalog
+from pond.catalogs.abstract_catalog import AbstractCatalog
 
 
 class State:
