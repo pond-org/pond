@@ -14,7 +14,6 @@ class SequentialRunner(AbstractRunner):
             hook.pre_pipe_execute(pipe)
         error = None
         success = True
-        # result = None
         for transform in pipe.get_transforms():
             for hook in hooks:
                 hook.pre_node_execute(transform)

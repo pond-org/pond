@@ -18,8 +18,6 @@ from pond.catalogs.iceberg_catalog import IcebergCatalog
 from pond.hooks.ui_hook import UIHook
 from pond.runners.sequential_runner import SequentialRunner
 
-# os.environ["PYICEBERG_HOME"] = os.getcwd()
-
 
 class Parameters(BaseModel):
     res: float
@@ -60,6 +58,7 @@ class Catalog(BaseModel):
 
 @node(Catalog, "file:cloud_files[:]", "clouds[:]")
 def parse_clouds(cloud_file: laspy.LasData) -> Cloud:
+    """Turn the cloud files into a pond-friendly format"""
     points = [
         Point(x=point[0], y=point[1], z=point[2]) for point in cloud_file.xyz[::20]
     ]
@@ -68,6 +67,7 @@ def parse_clouds(cloud_file: laspy.LasData) -> Cloud:
 
 @node(Catalog, "table:clouds[:].points", "cloud_bounds[:]")
 def compute_cloud_bounds(cloud: pa.Table) -> Bounds:
+    """Compute bounds for individual clouds"""
     min_max_x = pc.min_max(cloud["x"])
     min_max_y = pc.min_max(cloud["y"])
     return Bounds(
@@ -80,13 +80,13 @@ def compute_cloud_bounds(cloud: pa.Table) -> Bounds:
 
 @node(Catalog, "cloud_bounds", "bounds")
 def compute_bounds(cloud_bounds: list[Bounds]) -> Bounds:
+    """Combine individual bounds into global bounds"""
     bounds = Bounds(minx=np.inf, maxx=-np.inf, miny=np.inf, maxy=-np.inf)
     for cloud_bound in cloud_bounds:
         bounds.minx = min(cloud_bound.minx, bounds.minx)
         bounds.miny = min(cloud_bound.miny, bounds.miny)
         bounds.maxx = max(cloud_bound.maxx, bounds.maxx)
         bounds.maxy = max(cloud_bound.maxy, bounds.maxy)
-    print("Result: ", bounds)
     return bounds
 
 
@@ -98,10 +98,9 @@ def compute_bounds(cloud_bounds: list[Bounds]) -> Bounds:
 def compute_cloud_heightmap(
     res: float, cloud: pa.Table, bounds: Bounds
 ) -> tuple[np.ndarray, np.ndarray]:
+    """Compute individual heightmaps from clouds and bounds"""
     xbins = np.arange(bounds.minx, bounds.maxx + 0.5 * res, res)
     ybins = np.arange(bounds.miny, bounds.maxy + 0.5 * res, res)
-    print(type(cloud))
-    print("CLOUD: ", cloud["x"])
     sums, _, _ = np.histogram2d(
         cloud["x"].to_numpy(),
         cloud["y"].to_numpy(),
@@ -120,6 +119,7 @@ def compute_cloud_heightmap(
 
 @node(Catalog, ["file:grid_sums", "file:grid_counts"], "file:heightmap")
 def compute_heightmap(sums: list[np.ndarray], counts: list[np.ndarray]) -> np.ndarray:
+    """Combine individual heightmaps into global heightmap"""
     count = sum(counts)
     count[count == 0] = 1.0
     return sum(sums) / count
@@ -127,6 +127,7 @@ def compute_heightmap(sums: list[np.ndarray], counts: list[np.ndarray]) -> np.nd
 
 @node(Catalog, ["params.res", "file:heightmap", "bounds"], "file:heightmap_plot")
 def plot_heightmap(res: float, heightmap: np.ndarray, bounds: Bounds) -> go.Figure:
+    """Plot final heightmap as png"""
     xbins = np.arange(bounds.minx + 0.5 * res, bounds.maxx, res)
     ybins = np.arange(bounds.miny + 0.5 * res, bounds.maxy, res)
     fig = px.imshow(
@@ -138,20 +139,20 @@ def plot_heightmap(res: float, heightmap: np.ndarray, bounds: Bounds) -> go.Figu
     return fig
 
 
-def prepare_pipe() -> TransformPipe:
+def preprocessing() -> TransformPipe:
     return pipe(
         [
             index_files(Catalog, "cloud_files"),
+            parse_clouds,
         ],
-        output="cloud_files",
+        output="clouds",
     )
 
 
 def heightmap_pipe() -> TransformPipe:
     return pipe(
         [
-            prepare_pipe(),
-            parse_clouds,
+            preprocessing(),
             compute_cloud_bounds,
             compute_bounds,
             compute_cloud_heightmap,
