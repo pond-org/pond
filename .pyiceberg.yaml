@@ -1,0 +1,6 @@
+catalog:
+  default:
+    type: sql
+    uri: sqlite:///iceberg_catalog/pyiceberg_catalog.db
+    init_catalog_tables: true
+    warehouse: file://iceberg_catalog

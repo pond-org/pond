@@ -47,8 +47,9 @@ def catalog() -> FileCatalog:
 def test_set_file_entry(request, catalog, tmp_path_factory, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
     storage_path = tmp_path_factory.mktemp("storage1")
+    volume_protocol_args = {"dir": {"path": storage_path}}
     root_path = "catalog"
-    lens = Lens(FileCatalog, "image", data_catalog, root_path, storage_path)
+    lens = Lens(FileCatalog, "image", data_catalog, root_path, volume_protocol_args)
     lens.set(catalog.image)
     value = lens.get()
     assert value.path == "catalog/image"
@@ -62,21 +63,25 @@ def test_set_file_entry(request, catalog, tmp_path_factory, data_catalog_fixture
     ), f"got size {repr(target.size)}, expected {repr(src.size)}"
     assert target.tobytes() == src.tobytes()
     storage_path = tmp_path_factory.mktemp("storage2")
-    lens = Lens(FileCatalog, "values", data_catalog, root_path, storage_path)
+    lens = Lens(FileCatalog, "values", data_catalog, root_path, volume_protocol_args)
     lens.set(catalog.values)
     value = lens.get()
     assert value.path == "catalog/values"
     assert value.get() == catalog.values.get()
     storage_path = tmp_path_factory.mktemp("storage4")
     lens = Lens(
-        FileCatalog, "drives[0].navigation", data_catalog, root_path, storage_path
+        FileCatalog,
+        "drives[0].navigation",
+        data_catalog,
+        root_path,
+        volume_protocol_args,
     )
     lens.set(catalog.drives[0].navigation)
     value = lens.get()
     assert value.path == "catalog/drives/0/navigation"
     assert value.get() == catalog.drives[0].navigation.get()
     storage_path = tmp_path_factory.mktemp("storage3")
-    lens = Lens(FileCatalog, "drives", data_catalog, root_path, storage_path)
+    lens = Lens(FileCatalog, "drives", data_catalog, root_path, volume_protocol_args)
     lens.set(catalog.drives)
     value = lens.get()
     assert value == catalog.drives
@@ -88,11 +93,12 @@ def test_set_file_entry(request, catalog, tmp_path_factory, data_catalog_fixture
 def test_get_file_part(request, catalog, tmp_path_factory, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
     storage_path = tmp_path_factory.mktemp("storage")
+    volume_protocol_args = {"dir": {"path": storage_path}}
     root_path = "catalog"
-    lens = Lens(FileCatalog, "", data_catalog, root_path, storage_path)
+    lens = Lens(FileCatalog, "", data_catalog, root_path, volume_protocol_args)
     lens.set(catalog)
 
-    lens = Lens(FileCatalog, "image", data_catalog, root_path, storage_path)
+    lens = Lens(FileCatalog, "image", data_catalog, root_path, volume_protocol_args)
     value = lens.get()
     assert value.path == "catalog/image"
     src = catalog.image.get()
@@ -105,18 +111,22 @@ def test_get_file_part(request, catalog, tmp_path_factory, data_catalog_fixture)
     ), f"got size {repr(target.size)}, expected {repr(src.size)}"
     assert target.tobytes() == src.tobytes()
 
-    lens = Lens(FileCatalog, "values", data_catalog, root_path, storage_path)
+    lens = Lens(FileCatalog, "values", data_catalog, root_path, volume_protocol_args)
     value = lens.get()
     assert value.path == "catalog/values"
     assert value.get() == catalog.values.get()
 
     lens = Lens(
-        FileCatalog, "drives[0].navigation", data_catalog, root_path, storage_path
+        FileCatalog,
+        "drives[0].navigation",
+        data_catalog,
+        root_path,
+        volume_protocol_args,
     )
     value = lens.get()
     assert value.path == "catalog/drives/0/navigation"
     assert value.get() == catalog.drives[0].navigation.get()
 
-    lens = Lens(FileCatalog, "drives", data_catalog, root_path, storage_path)
+    lens = Lens(FileCatalog, "drives", data_catalog, root_path, volume_protocol_args)
     value = lens.get()
     assert value == catalog.drives

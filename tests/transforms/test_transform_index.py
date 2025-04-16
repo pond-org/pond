@@ -35,7 +35,8 @@ def test_get_file_paths():
 )
 def test_transform_index(request, catalog, filled_storage, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
-    state = State(FileCatalog, data_catalog, storage_path=filled_storage)
+    volume_protocol_args = {"dir": {"path": filled_storage}}
+    state = State(FileCatalog, data_catalog, volume_protocol_args=volume_protocol_args)
     t = TransformIndex(FileCatalog)
     for unit in t.get_execute_units(state):
         unit.execute_on(state)

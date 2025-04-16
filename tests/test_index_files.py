@@ -15,13 +15,14 @@ from tests.test_file_utils import FileCatalog, catalog, filled_storage
 def test_index_files(request, catalog, filled_storage, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
     # storage_path = tmp_path_factory.mktemp("storage")
+    volume_protocol_args = {"dir": {"path": filled_storage}}
 
     root_path = "catalog"
-    lens = Lens(FileCatalog, "", data_catalog, root_path, filled_storage)
+    lens = Lens(FileCatalog, "", data_catalog, root_path, volume_protocol_args)
     lens.index_files()
     # lens.set(catalog)
 
-    lens = Lens(FileCatalog, "image", data_catalog, root_path, filled_storage)
+    lens = Lens(FileCatalog, "image", data_catalog, root_path, volume_protocol_args)
     value = lens.get()
     assert value.path == "catalog/image"
     src = catalog.image.get()
@@ -34,11 +35,11 @@ def test_index_files(request, catalog, filled_storage, data_catalog_fixture):
     ), f"got size {repr(target.size)}, expected {repr(src.size)}"
     assert target.tobytes() == src.tobytes()
 
-    lens = Lens(FileCatalog, "images", data_catalog, root_path, filled_storage)
+    lens = Lens(FileCatalog, "images", data_catalog, root_path, volume_protocol_args)
     value = lens.get()
     for i, image in enumerate(catalog.images):
         # TODO: make this work as well
-        # lens = Lens(FileCatalog, f"images[{i}]", data_catalog, root_path, filled_storage)
+        # lens = Lens(FileCatalog, f"images[{i}]", data_catalog, root_path, volume_protocol_args)
         # value = lens.get()
         assert value[i].path == f"catalog/images/test_{i}"
         src = image.get()
@@ -51,20 +52,24 @@ def test_index_files(request, catalog, filled_storage, data_catalog_fixture):
         ), f"got size {repr(target.size)}, expected {repr(src.size)}"
         assert target.tobytes() == src.tobytes()
 
-    lens = Lens(FileCatalog, "values", data_catalog, root_path, filled_storage)
+    lens = Lens(FileCatalog, "values", data_catalog, root_path, volume_protocol_args)
     value = lens.get()
     assert value.path == "catalog/values"
     assert value.get() == catalog.values.get()
 
     lens = Lens(
-        FileCatalog, "drives[0].navigation", data_catalog, root_path, filled_storage
+        FileCatalog,
+        "drives[0].navigation",
+        data_catalog,
+        root_path,
+        volume_protocol_args,
     )
     value = lens.get()
     assert value.path == "catalog/drives/test_1/navigation"
     assert value.get() == catalog.drives[1].navigation.get()
 
     lens = Lens(
-        FileCatalog, "drives[1].images", data_catalog, root_path, filled_storage
+        FileCatalog, "drives[1].images", data_catalog, root_path, volume_protocol_args
     )
     value = lens.get()
     assert value.path == "catalog/drives/test_0/images"
@@ -80,9 +85,10 @@ def test_index_files(request, catalog, filled_storage, data_catalog_fixture):
 )
 def test_state_index_files(request, catalog, filled_storage, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
+    volume_protocol_args = {"dir": {"path": filled_storage}}
 
     root_path = "catalog"
-    state = State(FileCatalog, data_catalog, root_path, filled_storage)
+    state = State(FileCatalog, data_catalog, root_path, volume_protocol_args, "dir")
     state.index_files()
 
     value = state["image"]

@@ -30,6 +30,7 @@ def catalog() -> TableCatalog:
 def test_set_table_entry(request, tmp_path_factory, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
     storage_path = tmp_path_factory.mktemp("storage")
+    volume_protocol_args = {"dir": {"path": storage_path}}
     root_path = "catalog"
 
     mileage = pa.array([200.0, 300.0, 90.0, 410.0])
@@ -47,7 +48,9 @@ def test_set_table_entry(request, tmp_path_factory, data_catalog_fixture):
     )
     cars = pa.table([mileage, brand, top_speed, build_year], schema=schema)
 
-    lens = Lens(TableCatalog, "table:cars", data_catalog, root_path, storage_path)
+    lens = Lens(
+        TableCatalog, "table:cars", data_catalog, root_path, volume_protocol_args
+    )
     lens.set(cars)
     value = lens.get()
     assert value.equals(cars)

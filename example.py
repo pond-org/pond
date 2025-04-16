@@ -17,6 +17,7 @@ from pond.transforms.transform_pipe import TransformPipe
 from pond.catalogs.iceberg_catalog import IcebergCatalog
 from pond.hooks.ui_hook import UIHook
 from pond.runners.sequential_runner import SequentialRunner
+from pond.volume import load_volume_protocol_args
 
 
 class Parameters(BaseModel):
@@ -166,7 +167,8 @@ def heightmap_pipe() -> TransformPipe:
 
 def main():
     catalog = IcebergCatalog(load_catalog(name="default"))
-    state = State(Catalog, catalog, storage_path=os.path.join(os.getcwd(), "storage"))
+    volume_args = load_volume_protocol_args()
+    state = State(Catalog, catalog, volume_protocol_args=volume_args)
     ui_client = UIHook(1, "nils", "pond")
     runner = SequentialRunner()
 

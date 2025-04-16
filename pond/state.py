@@ -1,4 +1,6 @@
+import os
 from typing import Type, Any
+import yaml
 
 from pydantic import BaseModel
 from pond.lens import Lens
@@ -11,16 +13,25 @@ class State:
         root_type: Type[BaseModel],
         catalog: AbstractCatalog,
         root_path: str = "catalog",
-        storage_path: str = ".",
+        # storage_path: str = ".",
+        volume_protocol_args: dict[str, Any] = {},
+        default_volume_protocol: str = "dir",
     ):
         self.root_type = root_type
         self.catalog = catalog
         self.root_path = root_path
-        self.storage_path = storage_path
+        self.volume_protocol_args = volume_protocol_args
+        self.default_volume_protocol = default_volume_protocol
+        # self.storage_path = storage_path
 
     def lens(self, path: str) -> Lens:
         lens = Lens(
-            self.root_type, path, self.catalog, self.root_path, self.storage_path
+            self.root_type,
+            path,
+            self.catalog,
+            self.root_path,
+            self.volume_protocol_args,
+            self.default_volume_protocol,
         )
         return lens
 

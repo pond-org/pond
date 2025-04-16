@@ -8,6 +8,7 @@ from parse import parse
 import pydantic_to_pyarrow
 from pydantic._internal import _generics
 import pyarrow as pa
+import fsspec
 
 from pond.catalogs.abstract_catalog import (
     TypeField,
@@ -147,12 +148,22 @@ class Lens(LensInfo):
         path: str,
         catalog: AbstractCatalog,
         root_path: str = "catalog",
-        storage_path: str = ".",
+        volume_protocol_args: dict[str, Any] = {},
+        default_volume_protocol: str = "dir",
     ):
         super().__init__(root_type, get_cleaned_path(path, root_path))
         self.catalog = catalog
-        self.storage_path = storage_path
-        self.fs = LocalFileSystem(auto_mkdir=True)
+        # self.storage_path = storage_path
+        self.volume_protocol_args = volume_protocol_args
+        self.default_volume_protocol = default_volume_protocol
+        for name, args in self.volume_protocol_args.items():
+            if "protocol" not in args:
+                args["protocol"] = name
+            if args["protocol"] == "dir":
+                args["target_protocol"] = "file"
+                args["target_options"] = {"auto_mkdir": True}
+        # self.fs = LocalFileSystem(auto_mkdir=True)
+        # self.fs = fsspec.filesystem(**self.volume_protocol_args)
 
     def len(self) -> int:
         return self.catalog.len(self.lens_path)
@@ -174,9 +185,11 @@ class Lens(LensInfo):
             print(f"Checking file: {path}")
             # NOTE: we need to check existence and extension here
             ext = extra_args["ext"]
+            protocol = extra_args.get("protocol", self.default_volume_protocol)
             lens_path = LensPath(path=path)
-            fs_path = f"{self.storage_path}/{file_path}.{ext}"
-            if not self.fs.exists(fs_path):
+            fs = fsspec.filesystem(**self.volume_protocol_args[protocol])
+            fs_path = f"{file_path}.{ext}"
+            if not fs.exists(fs_path):
                 print("FILE DOES NOT EXIST: ", fs_path)
                 return
             value = File(path=file_path)
@@ -193,10 +206,12 @@ class Lens(LensInfo):
             # for i, value in enumerate(model):
             #     self.index_files_impl(f"{path}/{i}", value)
             ext = extra_args["ext"]
+            protocol = extra_args.get("protocol", self.default_volume_protocol)
             lens_path = LensPath(path=path)
             # fs_path = f"{self.storage_path}/{lens_path.to_volume_path()}"
             print(f"Checking fs path {file_path}")
-            listing = self.fs.ls(f"{self.storage_path}/{file_path}", detail=True)
+            fs = fsspec.filesystem(**self.volume_protocol_args[protocol])
+            listing = fs.ls(file_path, detail=True)
             values = []
             for info in listing:
                 print(info["name"][-(len(ext) + 1) :])
@@ -210,8 +225,8 @@ class Lens(LensInfo):
                     #     self.storage_path, info["name"]
                     # )
                     # item_name, item_ext = self.fs.splitext(item_path)
-                    print("Storage path: ", self.storage_path)
-                    item_path = info["name"][len(str(self.storage_path)) + 1 :]
+                    # print("Storage path: ", self.storage_path)
+                    item_path = info["name"]  # [len(str(self.storage_path)) + 1 :]
                     item_path, item_ext = item_path.split(".")
                     # assert (
                     #     len(parts) == 2
@@ -237,9 +252,12 @@ class Lens(LensInfo):
             # or should we just list all the folders here instead?
             # lens_path = LensPath(path=path)
             # fs_path = f"{self.storage_path}/{lens_path.to_volume_path()}"
-            if not self.fs.exists(f"{self.storage_path}/{file_path}"):
+            fs = fsspec.filesystem(
+                **self.volume_protocol_args[self.default_volume_protocol]
+            )
+            if not fs.exists(file_path):
                 return
-            listing = self.fs.ls(f"{self.storage_path}/{file_path}", detail=True)
+            listing = fs.ls(file_path, detail=True)
             counter = 0
             for info in listing:
                 if info["type"] == "directory":
@@ -267,7 +285,9 @@ class Lens(LensInfo):
         if isinstance(model, File):
             reader = extra_args["reader"]
             ext = extra_args["ext"]
-            model.object = reader(self.fs, f"{self.storage_path}/{model.path}.{ext}")
+            protocol = extra_args.get("protocol", self.default_volume_protocol)
+            fs = fsspec.filesystem(**self.volume_protocol_args[protocol])
+            model.object = reader(fs, f"{model.path}.{ext}")
         elif isinstance(model, list):
             for i, value in enumerate(model):
                 self.get_file_paths(value, extra_args)
@@ -370,7 +390,9 @@ class Lens(LensInfo):
             model.path = path
             writer = extra_args["writer"]
             ext = extra_args["ext"]
-            writer(model.get(), self.fs, f"{self.storage_path}/{path}.{ext}")
+            protocol = extra_args.get("protocol", self.default_volume_protocol)
+            fs = fsspec.filesystem(**self.volume_protocol_args[protocol])
+            writer(model.get(), fs, f"{path}.{ext}")
             return True
         elif isinstance(model, list):
             if len(model) == 0 or not self.set_file_paths(
