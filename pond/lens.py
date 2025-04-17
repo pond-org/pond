@@ -17,8 +17,6 @@ from pond.catalogs.abstract_catalog import (
 )
 from pond.field import File
 
-from fsspec.implementations.local import LocalFileSystem
-
 # NOTE: this does not require the root_type but we
 # should probably add validation of the type
 # This allows setting paths such as
@@ -169,9 +167,10 @@ class Lens(LensInfo):
         return self.catalog.len(self.lens_path)
 
     def index_files(self):
+        file_path = self.extra_args["path"] or self.lens_path.to_volume_path()
         self.index_files_impl(
             self.lens_path.path,
-            self.lens_path.to_volume_path(),
+            file_path,
             self.type,
             self.extra_args,
         )
@@ -185,7 +184,7 @@ class Lens(LensInfo):
             print(f"Checking file: {path}")
             # NOTE: we need to check existence and extension here
             ext = extra_args["ext"]
-            protocol = extra_args.get("protocol", self.default_volume_protocol)
+            protocol = extra_args["protocol"] or self.default_volume_protocol
             lens_path = LensPath(path=path)
             fs = fsspec.filesystem(**self.volume_protocol_args[protocol])
             fs_path = f"{file_path}.{ext}"
@@ -206,10 +205,11 @@ class Lens(LensInfo):
             # for i, value in enumerate(model):
             #     self.index_files_impl(f"{path}/{i}", value)
             ext = extra_args["ext"]
-            protocol = extra_args.get("protocol", self.default_volume_protocol)
+            protocol = extra_args["protocol"] or self.default_volume_protocol
             lens_path = LensPath(path=path)
             # fs_path = f"{self.storage_path}/{lens_path.to_volume_path()}"
             print(f"Checking fs path {file_path}")
+            print("Protocol: ", protocol)
             fs = fsspec.filesystem(**self.volume_protocol_args[protocol])
             listing = fs.ls(file_path, detail=True)
             values = []
@@ -275,8 +275,10 @@ class Lens(LensInfo):
                 extra_args = model_type.model_fields[field].json_schema_extra
                 field_type = model_type.model_fields[field].annotation
                 field_path = path + [TypeField(field, None)]
-                field_file_path = f"{file_path}/{field}"
-                # print(f"Trying to set {path}/{field} with extra args {extra_args}")
+                field_file_path = extra_args["path"] or f"{file_path}/{field}"
+                print(
+                    f"Trying to set {path}/{field} with path {field_file_path} extra args {extra_args}"
+                )
                 self.index_files_impl(
                     field_path, field_file_path, field_type, extra_args
                 )
@@ -285,7 +287,7 @@ class Lens(LensInfo):
         if isinstance(model, File):
             reader = extra_args["reader"]
             ext = extra_args["ext"]
-            protocol = extra_args.get("protocol", self.default_volume_protocol)
+            protocol = extra_args["protocol"] or self.default_volume_protocol
             fs = fsspec.filesystem(**self.volume_protocol_args[protocol])
             model.object = reader(fs, f"{model.path}.{ext}")
         elif isinstance(model, list):
@@ -390,7 +392,7 @@ class Lens(LensInfo):
             model.path = path
             writer = extra_args["writer"]
             ext = extra_args["ext"]
-            protocol = extra_args.get("protocol", self.default_volume_protocol)
+            protocol = extra_args["protocol"] or self.default_volume_protocol
             fs = fsspec.filesystem(**self.volume_protocol_args[protocol])
             writer(model.get(), fs, f"{path}.{ext}")
             return True

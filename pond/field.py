@@ -28,12 +28,21 @@ class File(BaseModel, Generic[DataT]):
 
 
 def Field(
-    *args, reader=None, writer=None, ext="pickle", json_schema_extra={}, **kwargs
+    *args,
+    reader=None,
+    writer=None,
+    ext="pickle",
+    path=None,
+    protocol=None,
+    json_schema_extra={},
+    **kwargs
 ):
     json_schema_extra = {
         "reader": reader,
         "writer": writer,
         "ext": ext,
+        "path": path,
+        "protocol": protocol,
         **json_schema_extra,
     }
     return pydantic.Field(*args, json_schema_extra=json_schema_extra, **kwargs)

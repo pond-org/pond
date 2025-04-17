@@ -1,4 +1,3 @@
-import os
 import numpy as np
 import pyarrow as pa
 import pyarrow.compute as pc
@@ -43,7 +42,9 @@ class Cloud(BaseModel):
 
 class Catalog(BaseModel):
     params: Parameters
-    cloud_files: list[File[laspy.LasData]] = Field(reader=read_las, ext="laz")
+    cloud_files: list[File[laspy.LasData]] = Field(
+        reader=read_las, ext="laz", path="raw_clouds"
+    )
     clouds: list[Cloud]
     cloud_bounds: list[Bounds]
     bounds: Bounds
