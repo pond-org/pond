@@ -1,6 +1,5 @@
 from abc import ABC
 from typing import NewType, Callable, Type, Any
-import functools
 import dill
 
 from pydantic import BaseModel
@@ -74,9 +73,6 @@ class ExecuteTransform(AbstractExecuteUnit):
         append_outputs: list[LensPath] = [],
     ):
         super().__init__(inputs, outputs)
-        # @functools.wraps(fn)
-        # def wrapper(*args, **kwargs):
-        #     return fn(*args, **kwargs)
         self.fn = fn #wrapper
         self.append_outputs = append_outputs
 
