@@ -1,0 +1,119 @@
+import numpy as np
+import pyarrow as pa
+import pyarrow.compute as pc
+import plotly.graph_objects as go
+import plotly.express as px
+import laspy
+
+from pond import State, File, Field, node, pipe, index_files
+from pond.transforms.transform_pipe import TransformPipe
+
+from example.catalog import Catalog, Cloud, Point, Bounds
+
+
+@node(Catalog, "file:cloud_files[:]", "clouds[:]")
+def parse_clouds(cloud_file: laspy.LasData) -> Cloud:
+    """Turn the cloud files into a pond-friendly format"""
+    points = [
+        Point(x=point[0], y=point[1], z=point[2]) for point in cloud_file.xyz[::20]
+    ]
+    return Cloud(points=points)
+
+
+@node(Catalog, "table:clouds[:].points", "cloud_bounds[:]")
+def compute_cloud_bounds(cloud: pa.Table) -> Bounds:
+    """Compute bounds for individual clouds"""
+    min_max_x = pc.min_max(cloud["x"])
+    min_max_y = pc.min_max(cloud["y"])
+    return Bounds(
+        minx=min_max_x["min"].as_py(),
+        maxx=min_max_x["max"].as_py(),
+        miny=min_max_y["min"].as_py(),
+        maxy=min_max_y["max"].as_py(),
+    )
+
+
+@node(Catalog, "cloud_bounds", "bounds")
+def compute_bounds(cloud_bounds: list[Bounds]) -> Bounds:
+    """Combine individual bounds into global bounds"""
+    bounds = Bounds(minx=np.inf, maxx=-np.inf, miny=np.inf, maxy=-np.inf)
+    for cloud_bound in cloud_bounds:
+        bounds.minx = min(cloud_bound.minx, bounds.minx)
+        bounds.miny = min(cloud_bound.miny, bounds.miny)
+        bounds.maxx = max(cloud_bound.maxx, bounds.maxx)
+        bounds.maxy = max(cloud_bound.maxy, bounds.maxy)
+    return bounds
+
+
+@node(
+    Catalog,
+    ["params.res", "table:clouds[:].points", "bounds"],
+    ["file:grid_sums[:]", "file:grid_counts[:]"],
+)
+def compute_cloud_heightmap(
+    res: float, cloud: pa.Table, bounds: Bounds
+) -> tuple[np.ndarray, np.ndarray]:
+    """Compute individual heightmaps from clouds and bounds"""
+    xbins = np.arange(bounds.minx, bounds.maxx + 0.5 * res, res)
+    ybins = np.arange(bounds.miny, bounds.maxy + 0.5 * res, res)
+    sums, _, _ = np.histogram2d(
+        cloud["x"].to_numpy(),
+        cloud["y"].to_numpy(),
+        bins=(xbins, ybins),
+        density=False,
+        weights=cloud["z"].to_numpy(),
+    )
+    counts, _, _ = np.histogram2d(
+        cloud["x"].to_numpy(),
+        cloud["y"].to_numpy(),
+        bins=(xbins, ybins),
+        density=False,
+    )
+    return sums, counts
+
+
+@node(Catalog, ["file:grid_sums", "file:grid_counts"], "file:heightmap")
+def compute_heightmap(sums: list[np.ndarray], counts: list[np.ndarray]) -> np.ndarray:
+    """Combine individual heightmaps into global heightmap"""
+    count = sum(counts)
+    count[count == 0] = 1.0
+    return sum(sums) / count
+
+
+@node(Catalog, ["params.res", "file:heightmap", "bounds"], "file:heightmap_plot")
+def plot_heightmap(res: float, heightmap: np.ndarray, bounds: Bounds) -> go.Figure:
+    """Plot final heightmap as png"""
+    xbins = np.arange(bounds.minx + 0.5 * res, bounds.maxx, res)
+    ybins = np.arange(bounds.miny + 0.5 * res, bounds.maxy, res)
+    fig = px.imshow(
+        heightmap,
+        x=ybins,
+        y=xbins,
+        labels={"x": "Easting", "y": "Northing", "color": "Height"},
+    )
+    return fig
+
+
+def preprocessing() -> TransformPipe:
+    return pipe(
+        [
+            index_files(Catalog, "cloud_files"),
+            parse_clouds,
+        ],
+        output="clouds",
+    )
+
+
+def heightmap_pipe() -> TransformPipe:
+    return pipe(
+        [
+            preprocessing(),
+            compute_cloud_bounds,
+            compute_bounds,
+            compute_cloud_heightmap,
+            compute_heightmap,
+            plot_heightmap,
+        ],
+        input="params",
+        output="heightmap_plot",
+    )
