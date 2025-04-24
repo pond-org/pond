@@ -167,7 +167,10 @@ class Lens(LensInfo):
         return self.catalog.len(self.lens_path)
 
     def index_files(self):
-        file_path = self.extra_args["path"] or self.lens_path.to_volume_path()
+        if self.extra_args and self.extra_args.get("path", None):
+            file_path = self.extra_args["path"]
+        else:
+            file_path = self.lens_path.to_volume_path()
         self.index_files_impl(
             self.lens_path.path,
             file_path,
@@ -275,7 +278,11 @@ class Lens(LensInfo):
                 extra_args = model_type.model_fields[field].json_schema_extra
                 field_type = model_type.model_fields[field].annotation
                 field_path = path + [TypeField(field, None)]
-                field_file_path = extra_args["path"] or f"{file_path}/{field}"
+                print("RUNNING ", field_path, extra_args)
+                if extra_args and extra_args.get("path", None):
+                    field_file_path = extra_args["path"]
+                else:
+                    field_file_path = f"{file_path}/{field}"
                 print(
                     f"Trying to set {path}/{field} with path {field_file_path} extra args {extra_args}"
                 )
@@ -415,7 +422,7 @@ class Lens(LensInfo):
             return found
         return False
 
-    def set(self, value: EntryType, append: bool = False) -> bool:
+    def create_table(self, value: EntryType) -> pa.Table:
         # TODO: check that value is of type self.type
         print("FS path: ", self.lens_path.path)
         fs_path = self.lens_path.to_fspath(level=len(self.lens_path.path))
@@ -428,7 +435,6 @@ class Lens(LensInfo):
         print(schema)
         field_type = self.type  # type(value)
         value_to_write = None
-        per_row = False
 
         if self.lens_path.variant == "file":
             if _generics.get_origin(self.type) == File:
@@ -444,9 +450,7 @@ class Lens(LensInfo):
             assert isinstance(
                 value, pa.Table
             ), "pond requires table variant to use a pyarrow table"
-            return self.catalog.write_table(
-                value, self.lens_path, schema, per_row=per_row
-            )
+            return value
 
         # NOTE: table does not handle files
         self.set_file_paths(self.lens_path.to_volume_path(), value, self.extra_args)
@@ -481,9 +485,19 @@ class Lens(LensInfo):
         print("Writing value: ", value_to_write)
         table = pa.Table.from_pylist(value_to_write, schema=schema)
         print("Table: ", table)
+        return table
+
+    def write_table(self, table: pa.Table, append: bool = False) -> bool:
+        per_row = False
+        # return self.catalog.write_table(value, self.lens_path, schema, per_row=per_row)
         write_path = self.lens_path.path
+        schema = get_pyarrow_schema(self.type)
         if append and write_path[-1].index is not None:
             write_path = write_path[:-1] + [TypeField(write_path[-1].name, None)]
         return self.catalog.write_table(
             table, LensPath(write_path), schema, per_row=per_row, append=append
         )
+
+    def set(self, value: EntryType, append: bool = False) -> bool:
+        table = self.create_table(value)
+        return self.write_table(table, append=append)

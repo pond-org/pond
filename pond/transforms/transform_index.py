@@ -1,7 +1,11 @@
-import os
-import warnings
-from collections import OrderedDict
-from typing import Callable, Type, get_type_hints, get_origin, get_args, Self, Tuple
+from typing import (
+    Callable,
+    Type,
+    get_origin,
+    get_args,
+    Self,
+    Any,
+)
 
 from pydantic import BaseModel
 from pydantic._internal import _generics
@@ -46,8 +50,20 @@ class ExecuteIndex(AbstractExecuteUnit):
     def __init__(self, inputs: list[LensPath], outputs: list[LensPath]):
         super().__init__(inputs, outputs)
 
-    def execute_on(self, state: State) -> None:
+    def load_inputs(self, state: State) -> list[Any]:
+        return []
+
+    def save_outputs(self, state: State, rtns: list[Any]) -> list[Any]:
+        return []
+
+    def commit(self, state: State, values: list[Any]) -> bool:
+        # NOTE: this could be done in different
+        # execute units for parallelism
         state.index_files([o.to_path() for o in self.outputs])
+        return True
+
+    def run(self, args: list[Any]) -> list[Any]:
+        return []
 
 
 class TransformIndex(AbstractExecuteTransform):
@@ -73,7 +89,7 @@ class TransformIndex(AbstractExecuteTransform):
         )
 
     def get_fn(self) -> Callable:
-        return ExecuteIndex.execute_on
+        return ExecuteIndex.save_outputs
 
     def get_inputs(self) -> list[LensPath]:
         return []
