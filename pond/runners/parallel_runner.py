@@ -14,25 +14,7 @@ from pond.transforms.abstract_transform import AbstractExecuteUnit
 from pond.hooks.abstract_hook import AbstractHook
 
 
-from pond.catalogs.iceberg_catalog import IcebergCatalog
-from pyiceberg.catalog import load_catalog
-from pond.volume import load_volume_protocol_args
-
-# def execute_unit(unit: AbstractExecuteUnit, args: list[Any], t: int):
-#     rtns = unit.run(args)
-#     return unit, rtns, t
-
-
-# def execute_unit(state: State, unit: AbstractExecuteUnit, t: int):
-#     args = unit.load_inputs(state)
-#     rtns = unit.run(args)
-#     return unit, rtns, t
-
-
-def execute_unit(Catalog, unit: AbstractExecuteUnit, t: int, lock):
-    catalog = IcebergCatalog(load_catalog(name="default"))
-    volume_args = load_volume_protocol_args()
-    state = State(Catalog, catalog, volume_protocol_args=volume_args)
+def execute_unit(state: State, unit: AbstractExecuteUnit, t: int, lock):
     args = unit.load_inputs(state)
     rtns = unit.run(args)
     values = unit.save_outputs(state, rtns)
@@ -89,13 +71,14 @@ class ParallelRunner(AbstractRunner):
                         execute_units = transform.get_execute_units(state)
                         execute_units_finished[t] = len(execute_units)
                         for unit in execute_units:
-                            # args = unit.load_inputs(state)
                             print("ADDING future with inputs: ", unit.get_inputs())
-                            # futures.add(pool.submit(execute_unit, unit, args, t))
-                            # futures.add(pool.submit(execute_unit, state, unit, t))
                             futures.add(
                                 pool.submit(
-                                    execute_unit, state.root_type, unit, t, lock
+                                    execute_unit,
+                                    state,
+                                    unit,
+                                    t,
+                                    lock,
                                 )
                             )
 

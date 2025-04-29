@@ -107,6 +107,12 @@ class AbstractCatalog(ABC):
     def len(self, path: LensPath) -> int:
         pass
 
+    def __getstate__(self):
+        pass
+
+    def __setstate__(self, state):
+        pass
+
     def write_table(
         self,
         table: pa.Table,

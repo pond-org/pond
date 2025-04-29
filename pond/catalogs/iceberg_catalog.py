@@ -1,12 +1,23 @@
+from typing import Optional
+
+from pyiceberg.catalog import load_catalog
 import pyarrow as pa
-from pyiceberg.catalog import Catalog
 
 from pond.catalogs.abstract_catalog import AbstractCatalog, LensPath
 
 
 class IcebergCatalog(AbstractCatalog):
-    def __init__(self, catalog: Catalog):
-        self.catalog = catalog
+    def __init__(self, name: str, **properties: Optional[str]):
+        self.name = name
+        self.properties = properties
+        self.catalog = load_catalog(name=name, **properties)
+
+    def __getstate__(self):
+        return self.name, self.properties
+
+    def __setstate__(self, state):
+        (self.name, self.properties) = state
+        self.catalog = load_catalog(name=self.name, **self.properties)
 
     # TODO: make this more efficient
     def len(self, path: LensPath) -> int:

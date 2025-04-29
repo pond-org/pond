@@ -10,6 +10,12 @@ class LanceCatalog(AbstractCatalog):
     def __init__(self, db_path: os.PathLike):
         self.db_path = db_path
 
+    def __getstate__(self):
+        return self.db_path
+
+    def __setstate__(self, state):
+        self.db_path = state
+
     # TODO: make this more efficient
     def len(self, path: LensPath) -> int:
         table, _ = self.load_table(path)

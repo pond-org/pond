@@ -41,34 +41,28 @@ def catalog() -> Catalog:
 @pytest.fixture
 def filled_iceberg_catalog(catalog: Catalog, tmp_path_factory):
     warehouse_path = tmp_path_factory.mktemp("iceberg_catalog")
-    iceberg_catalog = SqlCatalog(
+    data_catalog = IcebergCatalog(
         "default",
         **{
             "uri": f"sqlite:///{warehouse_path}/pyiceberg_catalog.db",
             "warehouse": f"file://{warehouse_path}",
         },
     )
-    data_catalog = IcebergCatalog(iceberg_catalog)
-    write_iceberg_dataset(catalog, iceberg_catalog)
-    print(iceberg_catalog.properties)
-    print(iceberg_catalog.list_namespaces())
-    print(iceberg_catalog.list_tables("catalog"))
-    print(iceberg_catalog.load_table("catalog.test").scan().to_arrow())
+    write_iceberg_dataset(catalog, data_catalog.catalog)
     return data_catalog
 
 
 @pytest.fixture
 def empty_iceberg_catalog(tmp_path_factory):
     warehouse_path = tmp_path_factory.mktemp("iceberg_catalog")
-    iceberg_catalog = SqlCatalog(
+    data_catalog = IcebergCatalog(
         "default",
         **{
             "uri": f"sqlite:///{warehouse_path}/pyiceberg_catalog.db",
             "warehouse": f"file://{warehouse_path}",
         },
     )
-    iceberg_catalog.create_namespace_if_not_exists("catalog")
-    data_catalog = IcebergCatalog(iceberg_catalog)
+    data_catalog.catalog.create_namespace_if_not_exists("catalog")
     return data_catalog
 
 
