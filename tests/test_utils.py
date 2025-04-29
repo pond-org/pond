@@ -2,7 +2,6 @@ import os
 import pytest
 
 import pyarrow as pa
-from pyiceberg.catalog.sql import SqlCatalog
 import lance
 
 from pond.catalogs.lance_catalog import LanceCatalog
@@ -43,10 +42,9 @@ def filled_iceberg_catalog(catalog: Catalog, tmp_path_factory):
     warehouse_path = tmp_path_factory.mktemp("iceberg_catalog")
     data_catalog = IcebergCatalog(
         "default",
-        **{
-            "uri": f"sqlite:///{warehouse_path}/pyiceberg_catalog.db",
-            "warehouse": f"file://{warehouse_path}",
-        },
+        type="sql",
+        uri=f"sqlite:///{warehouse_path}/pyiceberg_catalog.db",
+        warehouse=f"file://{warehouse_path}",
     )
     write_iceberg_dataset(catalog, data_catalog.catalog)
     return data_catalog
@@ -57,10 +55,9 @@ def empty_iceberg_catalog(tmp_path_factory):
     warehouse_path = tmp_path_factory.mktemp("iceberg_catalog")
     data_catalog = IcebergCatalog(
         "default",
-        **{
-            "uri": f"sqlite:///{warehouse_path}/pyiceberg_catalog.db",
-            "warehouse": f"file://{warehouse_path}",
-        },
+        type="sql",
+        uri=f"sqlite:///{warehouse_path}/pyiceberg_catalog.db",
+        warehouse=f"file://{warehouse_path}",
     )
     data_catalog.catalog.create_namespace_if_not_exists("catalog")
     return data_catalog
