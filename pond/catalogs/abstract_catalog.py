@@ -82,7 +82,7 @@ class LensPath:
         assert level >= 1 and level <= len(self.path)
         entries = list(
             map(
-                lambda p: p.name if p.index is None else f"{p.name}[{p.index}]",
+                lambda p: p.name if p.index is None else f"{p.name}__{p.index}",
                 self.path[:level],
             )
         )

@@ -15,6 +15,7 @@ from tests.test_utils import (
     filled_lance_catalog,
     empty_iceberg_catalog,
     empty_lance_catalog,
+    empty_delta_catalog,
 )
 
 from conf.catalog import Catalog, Drive, Navigation, Values
@@ -62,7 +63,8 @@ def test_db():
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_set_get_index(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
@@ -80,7 +82,8 @@ def test_set_get_index(request, catalog, data_catalog_fixture):
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_set_entry(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
@@ -111,7 +114,8 @@ def test_set_entry(request, catalog, data_catalog_fixture):
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_empty_list(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
@@ -126,7 +130,8 @@ def test_empty_list(request, catalog, data_catalog_fixture):
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_append(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
@@ -139,7 +144,8 @@ def test_append(request, catalog, data_catalog_fixture):
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_set_part(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
@@ -275,7 +281,7 @@ def test_path_and_query():
         TypeField("navigation", 0),
     ]
     assert path.path_and_query(1) == ("catalog", "drives[1]['navigation'][1]")
-    assert path.path_and_query(2) == ("catalog/drives[0]", "navigation[1]")
+    assert path.path_and_query(2) == ("catalog/drives__0", "navigation[1]")
 
 
 def test_to_path():

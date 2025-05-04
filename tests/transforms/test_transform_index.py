@@ -7,6 +7,7 @@ from pond.transforms.transform_index import TransformIndex
 from tests.test_utils import (
     empty_iceberg_catalog,
     empty_lance_catalog,
+    empty_delta_catalog,
 )
 from tests.test_file_utils import FileCatalog, catalog, filled_storage
 
@@ -31,7 +32,8 @@ def test_get_file_paths():
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_transform_index(request, catalog, filled_storage, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)

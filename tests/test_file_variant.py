@@ -8,6 +8,7 @@ from pond import Lens
 from tests.test_utils import (
     empty_iceberg_catalog,
     empty_lance_catalog,
+    empty_delta_catalog,
 )
 
 
@@ -27,7 +28,8 @@ def catalog() -> VariantCatalog:
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_set_entry(request, catalog, tmp_path_factory, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
@@ -75,7 +77,8 @@ def test_set_entry(request, catalog, tmp_path_factory, data_catalog_fixture):
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_set_file_entry(request, catalog, tmp_path_factory, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
@@ -138,7 +141,8 @@ def test_set_file_entry(request, catalog, tmp_path_factory, data_catalog_fixture
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_get_file_entry(request, catalog, tmp_path_factory, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)

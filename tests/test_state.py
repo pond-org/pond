@@ -9,13 +9,15 @@ from tests.test_utils import (
     filled_lance_catalog,
     empty_iceberg_catalog,
     empty_lance_catalog,
+    empty_delta_catalog,
 )
 
 from conf.catalog import Catalog
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_set_get_index(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
@@ -26,7 +28,8 @@ def test_set_get_index(request, catalog, data_catalog_fixture):
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_set_entry(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
@@ -46,7 +49,8 @@ def test_set_entry(request, catalog, data_catalog_fixture):
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_set_part(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)

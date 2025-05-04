@@ -12,6 +12,7 @@ from tests.test_utils import (
     filled_lance_catalog,
     empty_iceberg_catalog,
     empty_lance_catalog,
+    empty_delta_catalog,
 )
 
 
@@ -46,7 +47,8 @@ def test_transform_pipe():
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_execute_transform_pipe(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)

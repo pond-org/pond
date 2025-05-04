@@ -11,6 +11,7 @@ from tests.test_utils import (
     filled_lance_catalog,
     empty_iceberg_catalog,
     empty_lance_catalog,
+    empty_delta_catalog,
 )
 
 from conf.catalog import Catalog, Drive, Navigation
@@ -25,7 +26,8 @@ def value1_value2_not_annotated(value1: Any) -> Any:
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_transform(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
@@ -64,7 +66,8 @@ def drive_id(input: Drive) -> Drive:
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_list_items(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
@@ -83,7 +86,8 @@ def nav_list_id(input: list[Navigation]) -> list[Navigation]:
 
 
 @pytest.mark.parametrize(
-    ("data_catalog_fixture",), [("empty_iceberg_catalog",), ("empty_lance_catalog",)]
+    ("data_catalog_fixture",),
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
 def test_list(request, catalog, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)

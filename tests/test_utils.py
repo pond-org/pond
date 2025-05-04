@@ -6,6 +6,7 @@ import lance
 
 from pond.catalogs.lance_catalog import LanceCatalog
 from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.catalogs.delta_catalog import DeltaCatalog
 import pond.lens
 
 from conf.catalog import Catalog, Drive, Navigation, Values
@@ -75,6 +76,13 @@ def filled_lance_catalog(catalog: Catalog, tmp_path_factory):
     path = tmp_path_factory.mktemp("db")
     data_catalog = LanceCatalog(path)
     write_dataset(catalog, path)
+    return data_catalog
+
+
+@pytest.fixture
+def empty_delta_catalog(tmp_path_factory):
+    path = tmp_path_factory.mktemp("db")
+    data_catalog = DeltaCatalog(path)
     return data_catalog
 
 
