@@ -42,7 +42,8 @@ class DeltaCatalog(AbstractCatalog):
     ) -> bool:
         fs_path = path.to_fspath(level=len(path.path))
         mode = "append" if append else "overwrite"
-        if per_row:
+        print(f"Writing {fs_path} delta with schhema: {schema}")
+        if False:  # per_row:
             write_deltalake(
                 os.path.join(self.db_path, f"{fs_path}"),
                 table.take([0]),
@@ -69,36 +70,37 @@ class DeltaCatalog(AbstractCatalog):
         offset = None
         # limit = None
         for level in reversed(range(1, len(path.path) + 1)):
-            field_path, query = path.path_and_query(level, last_index=True)
+            field_path, query = path.path_and_query(
+                level, last_index=True, dot_accessor=True
+            )
             fs_path = os.path.join(self.db_path, field_path)
             if DeltaTable.is_deltatable(fs_path, self.storage_options):
                 break
             offset = path.path[level - 1].index
             if offset is None:
                 continue
-            field_path, query = path.path_and_query(level, last_index=False)
+            field_path, query = path.path_and_query(
+                level, last_index=False, dot_accessor=True
+            )
             fs_path = os.path.join(self.db_path, field_path)
             # if os.path.exists(fs_path):
             #     limit = 1
             #     break
             if DeltaTable.is_deltatable(fs_path, self.storage_options):
                 break
+            offset = None
             # offset = None
         # ds = lance.dataset(fs_path)
         delta_table = DeltaTable(fs_path, self.storage_options)
         indices = [offset] if offset is not None else [0]
         print(f"Getting {query} from {fs_path}")
         if query:
-            # print("Table: ", ds.to_table())
-            # table = delta_table.to_pyarrow_table(columns={"value": query})
-            print("QUERY!", indices, query)
-            # table = delta_table.to_pyarrow_table(
-            #     filters=[("index", "=", str(offset))], columns={"value": query}
-            # )
-            table = delta_table.to_pyarrow_dataset().take(
-                indices=indices, columns={"value": pc.field(query)}
-            )
-            # return type.parse_obj(table.to_pylist()[0]["value"])
+            if offset is not None:
+                table = delta_table.to_pyarrow_dataset().take(
+                    indices=indices, columns={"value": pc.field(query)}
+                )
+            else:
+                table = delta_table.to_pyarrow_table(columns={"value": pc.field(query)})
         elif offset is not None:
             print("INDEX!")
             # table = delta_table.to_pyarrow_table(filters=[("index", "=", str(offset))])

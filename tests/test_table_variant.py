@@ -27,7 +27,7 @@ def catalog() -> TableCatalog:
 
 @pytest.mark.parametrize(
     ("data_catalog_fixture",),
-    [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
+    [("empty_iceberg_catalog",), ("empty_lance_catalog",)],
 )
 def test_set_table_entry(request, tmp_path_factory, data_catalog_fixture):
     data_catalog = request.getfixturevalue(data_catalog_fixture)

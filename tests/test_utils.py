@@ -3,6 +3,7 @@ import pytest
 
 import pyarrow as pa
 import lance
+from deltalake import write_deltalake
 
 from pond.catalogs.lance_catalog import LanceCatalog
 from pond.catalogs.iceberg_catalog import IcebergCatalog
@@ -86,6 +87,14 @@ def empty_delta_catalog(tmp_path_factory):
     return data_catalog
 
 
+@pytest.fixture
+def filled_delta_catalog(catalog: Catalog, tmp_path_factory):
+    path = tmp_path_factory.mktemp("db")
+    data_catalog = DeltaCatalog(path)
+    write_delta_dataset(catalog, path)
+    return data_catalog
+
+
 def write_dataset(catalog, db_path):
     schema = pond.lens.get_pyarrow_schema(Catalog)
 
@@ -95,6 +104,15 @@ def write_dataset(catalog, db_path):
 
     ds = lance.write_dataset(
         data, os.path.join(db_path, "test.lance"), schema=schema, mode="overwrite"
+    )
+    return ds
+
+
+def write_delta_dataset(catalog, db_path):
+    schema = pond.lens.get_pyarrow_schema(Catalog)
+    data = pa.Table.from_pylist([catalog.model_dump()], schema=schema)
+    ds = write_deltalake(
+        os.path.join(db_path, "test"), data, schema=schema, mode="overwrite"
     )
     return ds
 

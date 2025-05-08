@@ -69,11 +69,13 @@ class LensPath:
             a.subset_of(b) for a, b in zip(self.path[: len(other.path)], other.path)
         )
 
-    def get_db_query(self, level: int = 1) -> str:
+    def get_db_query(self, level: int = 1, dot_accessor: bool = False) -> str:
         assert level >= 1 and level <= len(self.path)
         parts = []
         for i, field in enumerate(self.path[level:]):
-            parts.append(field.name if i == 0 else f"['{field.name}']")
+            # parts.append(field.name if i == 0 else f"['{field.name}']")
+            field_accessor = f".{field.name}" if dot_accessor else f"['{field.name}']"
+            parts.append(field.name if i == 0 else field_accessor)
             if field.index is not None:
                 parts.append(f"[{field.index+1}]")
         return "".join(parts)
@@ -98,9 +100,9 @@ class LensPath:
         return "/".join(entries)
 
     def path_and_query(
-        self, level: int = 1, last_index: bool = True
+        self, level: int = 1, last_index: bool = True, dot_accessor: bool = False
     ) -> tuple[os.PathLike, str]:
-        return self.to_fspath(level, last_index), self.get_db_query(level)
+        return self.to_fspath(level, last_index), self.get_db_query(level, dot_accessor)
 
 
 class AbstractCatalog(ABC):
