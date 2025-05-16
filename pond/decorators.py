@@ -10,6 +10,7 @@ from pond.transforms.transform import Transform
 from pond.transforms.transform_pipe import TransformPipe
 from pond.transforms.transform_index import TransformIndex
 from pond.transforms.transform_list import TransformList
+from pond.transforms.transform_construct import TransformConstruct
 
 
 class node:
@@ -41,6 +42,13 @@ def pipe(
     root_path: str = "catalog",
 ) -> TransformPipe:
     return TransformPipe(transforms, input, output, root_path)
+
+
+def construct(
+    Catalog: Type[BaseModel],
+    path: str = "",
+) -> TransformConstruct:
+    return TransformConstruct(Catalog, path)
 
 
 def index_files(
