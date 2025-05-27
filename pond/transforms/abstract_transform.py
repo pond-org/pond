@@ -121,3 +121,6 @@ class AbstractExecuteTransform(AbstractTransform):
 
     def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:
         pass
+
+    def needs_commit_lock(self) -> bool:
+        return False

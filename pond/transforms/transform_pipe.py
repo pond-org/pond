@@ -39,7 +39,9 @@ class TransformPipe(AbstractTransform):
                 ), f"Output {o.to_path()} already in inputs or produced!"
                 produced.append(o)
         for o in self.outputs:
-            assert o in produced, f"{o.to_path()} not in {self.outputs}"
+            assert (
+                o in produced
+            ), f"{o.to_path()} not in {[r.to_path() for r in self.outputs]}"
 
     def get_inputs(self) -> list[LensPath]:
         return self.inputs

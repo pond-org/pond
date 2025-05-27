@@ -117,7 +117,7 @@ class LensInfo:
         assert (
             self.lens_path.path[index].index is not None
         ), "Lens only supports setting index for list item lenses"
-        assert value >= 0
+        assert value >= 0 or value == -1
         self.lens_path.path[index].index = value
 
     def get_type(self) -> Type:

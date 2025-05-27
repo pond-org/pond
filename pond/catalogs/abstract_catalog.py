@@ -15,11 +15,15 @@ class TypeField:
     index: int | None
 
     def __eq__(self, other: Self) -> bool:
-        return self.name == other.name and self.index == other.index
+        self_index = self.index if self.index != -1 else None
+        other_index = other.index if other.index != -1 else None
+        return self.name == other.name and self_index == other_index
 
     def subset_of(self, other: Self):
+        self_index = self.index if self.index != -1 else None
+        other_index = other.index if other.index != -1 else None
         return self.name == other.name and (
-            other.index is None or self.index == other.index
+            other_index is None or self_index == other_index
         )
 
 
@@ -60,14 +64,18 @@ class LensPath:
         return copy.deepcopy(self)
 
     def __eq__(self, other: Self) -> bool:
-        return self.path == other.path
+        equal = self.path == other.path
+        # print(f"{self.path}=={other.path}? {equal}")
+        return equal
 
     def subset_of(self, other: Self) -> bool:
         if len(self.path) < len(other.path):
             return False
-        return all(
+        subset = all(
             a.subset_of(b) for a, b in zip(self.path[: len(other.path)], other.path)
         )
+        # print(f"{self.path} subset_of {other.path}? {subset}")
+        return subset
 
     def get_db_query(self, level: int = 1, dot_accessor: bool = False) -> str:
         assert level >= 1 and level <= len(self.path)
