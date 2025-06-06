@@ -66,15 +66,23 @@ class DeltaCatalog(AbstractCatalog):
             )
         return True
 
+    # def exists_at_level(self, path: LensPath) -> bool:
+    #     # Not sure about the last index
+    #     field_path = path.to_fspath(len(path.path) + 1, last_index=True)
+    #     fs_path = os.path.join(self.db_path, field_path)
+    #     return DeltaTable.is_deltatable(fs_path, self.storage_options)
+
     def load_table(self, path: LensPath) -> tuple[pa.Table | None, bool]:
         offset = None
         # limit = None
+        found = False
         for level in reversed(range(1, len(path.path) + 1)):
             field_path, query = path.path_and_query(
                 level, last_index=True, dot_accessor=True
             )
             fs_path = os.path.join(self.db_path, field_path)
             if DeltaTable.is_deltatable(fs_path, self.storage_options):
+                found = True
                 break
             offset = path.path[level - 1].index
             if offset is None:
@@ -87,9 +95,12 @@ class DeltaCatalog(AbstractCatalog):
             #     limit = 1
             #     break
             if DeltaTable.is_deltatable(fs_path, self.storage_options):
+                found = True
                 break
             offset = None
             # offset = None
+        if not found:
+            return None, False
         # ds = lance.dataset(fs_path)
         delta_table = DeltaTable(fs_path, self.storage_options)
         indices = [offset] if offset is not None else [0]

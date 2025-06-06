@@ -71,10 +71,12 @@ class ExecuteTransform(AbstractExecuteUnit):
         outputs: list[LensPath],
         fn: Callable,
         append_outputs: list[LensPath] = [],
+        # input_list_len: int = -1,
     ):
         super().__init__(inputs, outputs)
         self.fn = fn #wrapper
         self.append_outputs = append_outputs
+        # self.input_list_len = input_list_len
 
     def __getstate__(self):
         return dill.dumps((self.inputs, self.outputs, self.fn, self.append_outputs))
@@ -83,7 +85,29 @@ class ExecuteTransform(AbstractExecuteUnit):
         self.inputs, self.outputs, self.fn, self.append_outputs = dill.loads(state)
 
     def load_inputs(self, state: State) -> list[Any]:
-        args = [state[i.to_path()] for i in self.inputs]
+        args = []
+        for i in self.inputs:
+            try:
+                index = next(ind for ind, v in enumerate(i.path) if v.index == -1)
+                parent = LensPath(i.path[:index+1])
+                parent.path[-1].index = None
+                value = state[parent.to_path()]
+                if value is not None:
+                    args.append(value)
+                    continue
+                input_list = []
+                for list_index in range(0, 100000):
+                    i.path[index].index = list_index
+                    value = state[i.to_path()]
+                    if value is None:
+                        break
+                    input_list.append(value)
+                args.append(input_list)
+            except StopIteration:
+                args.append(state[i.to_path()]) 
+                continue
+            # if self.input_list_len == -1:
+            #     raise ValueError("Need to provide list len for execute transform to provide list inputs!")
         return args
 
     def save_outputs(self, state: State, rtns: list[Any]) -> list[Any]:

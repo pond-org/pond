@@ -53,6 +53,9 @@ class IcebergCatalog(AbstractCatalog):
             iceberg_table.overwrite(df=table)
         return True
 
+    # def exists_at_level(self, path: LensPath) -> bool:
+    #     return self.catalog.table_exists(path.path)
+
     def load_table(self, path: LensPath) -> tuple[pa.Table | None, bool]:
         # names = ["catalog"] + [p.name for p in path.path]
         names = ["catalog"] + [
@@ -60,6 +63,7 @@ class IcebergCatalog(AbstractCatalog):
         ]
         index = None
         print("Getting ident for ", path.path, ":", names)
+        found = False
         for level in reversed(range(1, len(path.path) + 1)):
             print("At level ", level)
             # namespace = ".".join(names[: level - 1])
@@ -68,6 +72,7 @@ class IcebergCatalog(AbstractCatalog):
             print(identifier, query)
             if self.catalog.table_exists(identifier):
                 print(f"{identifier} does exist!")
+                found = True
                 break
             index = path.path[level - 1].index
             if index is None:
@@ -78,9 +83,12 @@ class IcebergCatalog(AbstractCatalog):
             identifier = ".".join(names[:level] + [path.path[level - 1].name])
             if self.catalog.table_exists(identifier):
                 print(f"{identifier} does exist!")
+                found = True
                 break
             index = None
             print(f"{identifier} does not exist!")
+        if not found:
+            return None, False
         iceberg_table = self.catalog.load_table(identifier)
         print(iceberg_table.scan().to_arrow())
         if query:

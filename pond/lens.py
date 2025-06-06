@@ -59,6 +59,7 @@ def get_tree_type(
     if not path:
         return root_type, {}
     field = path.pop(0)
+    print("FIELD: ", field)
     field_type = root_type.model_fields[field.name].annotation
     extra_args = root_type.model_fields[field.name].json_schema_extra
     print("Root extra args: ", extra_args)
@@ -305,8 +306,10 @@ class Lens(LensInfo):
                 extra_args = model.model_fields[field].json_schema_extra
                 self.get_file_paths(value, extra_args)
 
-    def get(self) -> BaseModel:
+    def get(self) -> None | list[BaseModel] | BaseModel:
         table, is_query = self.catalog.load_table(self.lens_path)
+        if table is None:
+            return None
         # TODO: not that these could be treated the same way
         # the scalar ones are just one element list, just
         # need to assert length 1 and get the first element on return
