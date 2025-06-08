@@ -66,11 +66,11 @@ class DeltaCatalog(AbstractCatalog):
             )
         return True
 
-    # def exists_at_level(self, path: LensPath) -> bool:
-    #     # Not sure about the last index
-    #     field_path = path.to_fspath(len(path.path) + 1, last_index=True)
-    #     fs_path = os.path.join(self.db_path, field_path)
-    #     return DeltaTable.is_deltatable(fs_path, self.storage_options)
+    def exists_at_level(self, path: LensPath) -> bool:
+        # Not sure about the last index
+        field_path = path.to_fspath(len(path.path), last_index=True)
+        fs_path = os.path.join(self.db_path, field_path)
+        return DeltaTable.is_deltatable(fs_path, self.storage_options)
 
     def load_table(self, path: LensPath) -> tuple[pa.Table | None, bool]:
         offset = None

@@ -49,11 +49,11 @@ class LanceCatalog(AbstractCatalog):
             )
         return True
 
-    # def exists_at_level(self, path: LensPath) -> bool:
-    #     # Not sure about the last index
-    #     field_path = path.to_fspath(len(path.path) + 1, last_index=True)
-    #     fs_path = os.path.join(self.db_path, f"{field_path}.lance")
-    #     return os.path.exists(fs_path)
+    def exists_at_level(self, path: LensPath) -> bool:
+        # Not sure about the last index
+        field_path = path.to_fspath(len(path.path), last_index=True)
+        fs_path = os.path.join(self.db_path, f"{field_path}.lance")
+        return os.path.exists(fs_path)
 
     def load_table(self, path: LensPath) -> tuple[pa.Table | None, bool]:
         offset = None

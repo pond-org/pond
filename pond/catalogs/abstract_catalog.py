@@ -133,5 +133,20 @@ class AbstractCatalog(ABC):
     ) -> bool:
         pass
 
+    def exists_at_level(self, path: LensPath) -> bool:
+        pass
+
+    def exists(self, path: LensPath) -> bool:
+        if not path.path:  # len(path.path) <= 1:
+            return False
+        if self.exists_at_level(path):
+            return True
+        if path.path[-1].index is not None:
+            path = path.clone()
+            path.path[-1].index = None
+            if self.exists_at_level(path):
+                return True
+        return self.exists(LensPath(path.path[:-1]))
+
     def load_table(self, path: LensPath) -> pa.Table | None:
         pass

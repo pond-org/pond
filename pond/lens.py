@@ -167,6 +167,9 @@ class Lens(LensInfo):
     def len(self) -> int:
         return self.catalog.len(self.lens_path)
 
+    def exists(self) -> bool:
+        return self.catalog.exists(self.lens_path)
+
     def index_files(self):
         if self.extra_args and self.extra_args.get("path", None):
             file_path = self.extra_args["path"]

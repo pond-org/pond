@@ -53,8 +53,12 @@ class IcebergCatalog(AbstractCatalog):
             iceberg_table.overwrite(df=table)
         return True
 
-    # def exists_at_level(self, path: LensPath) -> bool:
-    #     return self.catalog.table_exists(path.path)
+    def exists_at_level(self, path: LensPath) -> bool:
+        names = ["catalog"] + [
+            p.name if p.index is None else f"{p.name}[{p.index}]" for p in path.path
+        ]
+        identifier = ".".join(names)
+        return self.catalog.table_exists(identifier)
 
     def load_table(self, path: LensPath) -> tuple[pa.Table | None, bool]:
         # names = ["catalog"] + [p.name for p in path.path]

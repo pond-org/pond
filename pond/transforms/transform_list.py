@@ -129,9 +129,22 @@ class TransformList(AbstractExecuteTransform):
         for name, (input_lens, index) in self.input_lenses.items():
             if index == -1:
                 continue
-            path = input_lens.lens_path.path
-            parent_path = LensPath(path[:index] + [TypeField(path[index].name, None)])
-            input_lengths[name] = state.lens(parent_path.to_path()).len()
+            i = input_lens.lens_path.clone()
+            parent_path = LensPath(
+                i.path[:index] + [TypeField(i.path[index].name, None)]
+            )
+            lens = state.lens(parent_path.to_path())
+            if lens.exists():
+                input_lengths[name] = lens.len()
+                continue
+            list_index = 0
+            while True:
+                i.path[index].index = list_index
+                lens = state.lens(i.to_path())
+                if not lens.exists():
+                    break
+                list_index += 1
+            input_lengths[name] = list_index
 
         print(input_lengths)
         unique_inputs = set(input_lengths.values())

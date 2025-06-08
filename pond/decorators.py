@@ -10,6 +10,7 @@ from pond.transforms.transform import Transform
 from pond.transforms.transform_pipe import TransformPipe
 from pond.transforms.transform_index import TransformIndex
 from pond.transforms.transform_list import TransformList
+from pond.transforms.transform_list_fold import TransformListFold
 from pond.transforms.transform_construct import TransformConstruct
 
 
@@ -29,10 +30,25 @@ class node:
         fn: Callable,
     ) -> AbstractExecuteTransform:
         inputs = self.input if isinstance(self.input, list) else [self.input]
+        outputs = self.output if isinstance(self.output, list) else [self.output]
+        list_input = False
+        list_output = False
         for input in inputs:
             if "[:]" in input:
-                return TransformList(self.Catalog, self.input, self.output, fn)
-        return Transform(self.Catalog, self.input, self.output, fn)
+                list_input = True
+                break
+        for output in outputs:
+            if "[:]" in output:
+                list_output = True
+                break
+        if list_input and list_output:
+            return TransformList(self.Catalog, self.input, self.output, fn)
+        elif list_input:
+            return TransformListFold(self.Catalog, self.input, self.output, fn)
+        elif list_output:
+            raise RuntimeError("Outputs can not use [:] indices without any in input")
+        else:
+            return Transform(self.Catalog, self.input, self.output, fn)
 
 
 def pipe(
