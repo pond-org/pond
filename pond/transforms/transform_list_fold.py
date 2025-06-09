@@ -27,19 +27,18 @@ class TransformListFold(Transform):
         fn: Callable,
     ):
         super().__init__(Catalog, input, output, fn, is_list_fold=True)
-        self.input_inds = []
         wildcard = False
         for input_lens in self.input_lenses.values():
             try:
-                index = next(
+                next(
                     index
                     for index, v in enumerate(input_lens.lens_path.path)
                     if v.index == -1
                 )
                 wildcard = True
+                break
             except StopIteration:
-                index = -1
-            self.input_inds.append(index)
+                pass
         if not wildcard:
             raise ValueError(
                 f"Transform list fold did not get any inputs with wildcard!"
