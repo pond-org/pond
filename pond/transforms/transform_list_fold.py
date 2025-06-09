@@ -13,11 +13,12 @@ from pond.transforms.abstract_transform import (
     AbstractExecuteUnit,
     ExecuteTransform,
 )
+from pond.transforms.transform import Transform
 
 
 # NOTE: this is actually a superset of the functionality
 # in transform, so we could use the same unit tests for that part
-class TransformListFold(AbstractExecuteTransform):
+class TransformListFold(Transform):
     def __init__(
         self,
         Catalog: Type[BaseModel],
@@ -25,113 +26,30 @@ class TransformListFold(AbstractExecuteTransform):
         output: list[str] | str,
         fn: Callable,
     ):
-        self.fn = fn
-        self.inputs = input if isinstance(input, list) else [input]
-        self.outputs = output if isinstance(output, list) else [output]
-
-        types = get_type_hints(self.fn)
-        try:
-            output_types = types.pop("return")
-        except KeyError as e:
-            raise RuntimeError(f"Transform does not have return type!") from e
-        try:
-            if is_subhint(output_types, Tuple):
-                output_types = list(get_args(output_types))
-        except BeartypeDoorNonpepException:
-            pass
-
-        if not isinstance(output_types, list):
-            output_types = [output_types]
-
-        # Here we need to go through and match all of the inputs
-        # and outputs to make sure the list iterations make sense
-        # and that we only have one group to iterate over
-        self.input_lenses = OrderedDict()
-        for (input_name, input_type), i in zip(types.items(), self.inputs):
-            if "[:]" in i:
-                # NOTE: this is always gonna be of type list
-                assert (
-                    i.count("[:]") == 1
-                ), "List transforms can only iterate over one expansion"
-                replace_element = i.find("[:]") + 1
-                lens_path = get_cleaned_path(i[: replace_element - 1], "dummy")
-                index = len(lens_path.path) - 1
-                input_lens = LensInfo.from_path(
-                    Catalog, i[:replace_element] + "0" + i[replace_element + 1 :]
+        super().__init__(Catalog, input, output, fn, is_list_fold=True)
+        self.input_inds = []
+        wildcard = False
+        for input_lens in self.input_lenses.values():
+            try:
+                index = next(
+                    index
+                    for index, v in enumerate(input_lens.lens_path.path)
+                    if v.index == -1
                 )
-                input_lens.set_index(index, -1)
-            else:
-                input_lens = LensInfo.from_path(Catalog, i)
+                wildcard = True
+            except StopIteration:
                 index = -1
-            try:
-                print("Type: ", input_lens.get_type())
-                input_lens_type = input_lens.get_type()
-                if index != -1:
-                    input_lens_type = list[input_lens_type]
-                type_checks = is_subhint(input_lens_type, input_type)
-                assert (
-                    type_checks
-                ), f"Input {input_name} of type {input_type} does not agree with catalog entry {i} with type {input_lens.get_type()}"
-                print(f"{input_lens.get_type()} checks with {input_type}!")
-            except BeartypeDoorNonpepException as m:
-                warnings.warn(str(m))
-            self.input_lenses[i] = (input_lens, index)
-
-        self.output_lenses = OrderedDict(
-            (o, LensInfo.from_path(Catalog, o)) for o in self.outputs
-        )
-        for output_type, (output_field_name, output_lens) in zip(
-            output_types, self.output_lenses.items(), strict=True
-        ):
-            try:
-                type_checks = is_subhint(output_lens.get_type(), output_type)
-                assert (
-                    type_checks
-                ), f"Output of type {output_type} does not agree with catalog entry {output_field_name} with type {output_lens.get_type()}"
-                print(f"{output_lens.get_type()} checks with {output_type}!")
-            except BeartypeDoorNonpepException as m:
-                warnings.warn(str(m))
-
-    def get_name(self) -> str:
-        return self.fn.__name__
-
-    def get_docs(self) -> str:
-        return self.fn.__doc__
-
-    def get_fn(self) -> Callable:
-        return self.fn
-
-    def get_inputs(self) -> list[LensPath]:
-        return [i[0].lens_path for i in self.input_lenses.values()]
-
-    def get_outputs(self) -> list[LensPath]:
-        return [o.lens_path for o in self.output_lenses.values()]
-
-    def get_transforms(self) -> list[Self]:
-        return [self]
+            self.input_inds.append(index)
+        if not wildcard:
+            raise ValueError(
+                f"Transform list fold did not get any inputs with wildcard!"
+            )
 
     def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:
-        # input_lengths = {}
-        # TODO: we need to fix the computation of len for
-        # lists across multiple lenses
-        # for name, (input_lens, index) in self.input_lenses.items():
-        #     if index == -1:
-        #         continue
-        #     path = input_lens.lens_path.path
-        #     parent_path = LensPath(path[:index] + [TypeField(path[index].name, None)])
-        #     input_lengths[name] = state.lens(parent_path.to_path()).len()
-
-        # print(input_lengths)
-        # unique_inputs = set(input_lengths.values())
-        # assert (
-        #     len(unique_inputs) == 1
-        # ), f"Input lengths are not the same: {input_lengths}"
-        # length = unique_inputs.pop()
-
         # NOTE: setting output indices is actually not strictly necessary
         return [
             ExecuteTransform(
-                inputs=[i[0].lens_path.clone() for i in self.input_lenses.values()],
+                inputs=[i.lens_path.clone() for i in self.input_lenses.values()],
                 outputs=[o.lens_path for o in self.output_lenses.values()],
                 fn=self.fn,
                 # input_list_len=length,  # TODO: implement

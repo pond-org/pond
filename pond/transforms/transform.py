@@ -26,6 +26,7 @@ class Transform(AbstractExecuteTransform):
         input: list[str] | str,
         output: list[str] | str,
         fn: Callable,
+        is_list_fold: bool = False,
     ):
         self.fn = fn
         inputs = input if isinstance(input, list) else [input]
@@ -54,8 +55,19 @@ class Transform(AbstractExecuteTransform):
             types.items(), self.input_lenses.items(), strict=True
         ):
             try:
+                wildcard_index = next(
+                    index
+                    for index, v in enumerate(input_lens.lens_path.path)
+                    if v.index == -1
+                )
+            except StopIteration:
+                wildcard_index = -1
+            try:
                 print("Type: ", input_lens.get_type())
-                type_checks = is_subhint(input_lens.get_type(), input_type)
+                input_lens_type = input_lens.get_type()
+                if is_list_fold and wildcard_index != -1:
+                    input_lens_type = list[input_lens_type]
+                type_checks = is_subhint(input_lens_type, input_type)
                 assert (
                     type_checks
                 ), f"Input {input_name} of type {input_type} does not agree with catalog entry {input_field_name} with type {input_lens.get_type()}"
