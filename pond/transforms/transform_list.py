@@ -48,19 +48,14 @@ class TransformList(AbstractExecuteTransform):
         # and that we only have one group to iterate over
         self.input_lenses = OrderedDict()
         for (input_name, input_type), i in zip(types.items(), self.inputs):
-            if "[:]" in i:
-                assert (
-                    i.count("[:]") == 1
-                ), "List transforms can only iterate over one expansion"
-                replace_element = i.find("[:]") + 1
-                lens_path = get_cleaned_path(i[: replace_element - 1], "dummy")
-                index = len(lens_path.path) - 1
-                input_lens = LensInfo.from_path(
-                    Catalog, i[:replace_element] + "0" + i[replace_element + 1 :]
+            input_lens = LensInfo.from_path(Catalog, i)
+            try:
+                index = next(
+                    index
+                    for index, v in enumerate(input_lens.lens_path.path)
+                    if v.index == -1
                 )
-                input_lens.set_index(index, -1)
-            else:
-                input_lens = LensInfo.from_path(Catalog, i)
+            except StopIteration:
                 index = -1
             try:
                 print("Type: ", input_lens.get_type())
@@ -76,24 +71,15 @@ class TransformList(AbstractExecuteTransform):
         self.output_lenses = OrderedDict()
         found = False
         for output_type, o in zip(output_types, self.outputs):
-            if "[:]" in o:
-                # assert o.endswith(
-                #     "[:]"
-                # ), "pond does not yet allow iterating over children for outputs"
-                # replace_element = len(o) - 2
-                assert (
-                    o.count("[:]") == 1
-                ), "List transforms can only iterate over one expansion"
-                replace_element = o.find("[:]") + 1
-                lens_path = get_cleaned_path(o[: replace_element - 1], "dummy")
-                index = len(lens_path.path) - 1
-                output_lens = LensInfo.from_path(
-                    Catalog, o[:replace_element] + "0" + o[replace_element + 1 :]
+            output_lens = LensInfo.from_path(Catalog, o)
+            try:
+                index = next(
+                    index
+                    for index, v in enumerate(output_lens.lens_path.path)
+                    if v.index == -1
                 )
-                output_lens.set_index(index, -1)
                 found = True
-            else:
-                output_lens = LensInfo.from_path(Catalog, o)
+            except StopIteration:
                 index = -1
             try:
                 type_checks = is_subhint(output_lens.get_type(), output_type)

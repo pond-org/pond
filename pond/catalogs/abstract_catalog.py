@@ -40,8 +40,13 @@ class LensPath:
         if path == "":
             return LensPath(parts)
         components = path.split(".")
+        wildcards = 0
         for i, c in enumerate(components):
-            if matches := parse("{:w}[{:d}]", c):
+            if matches := parse("{:w}[:]", c):
+                name = matches[0]
+                index = -1
+                wildcards += 1
+            elif matches := parse("{:w}[{:d}]", c):
                 name, index = matches
             elif matches := parse("{:w}", c):
                 name = matches[0]
@@ -49,6 +54,10 @@ class LensPath:
             else:
                 raise RuntimeError(f"Could not parse {c} as column")
             parts.append(TypeField(name, index))
+        if wildcards > 1:
+            raise RuntimeError(
+                f"Only one wildcard currently supported by pond, got {path}"
+            )
         return LensPath(parts, variant)
 
     def to_path(self) -> str:
