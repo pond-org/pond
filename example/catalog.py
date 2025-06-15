@@ -27,21 +27,21 @@ class Bounds(BaseModel):
 
 class Cloud(BaseModel):
     points: list[Point]
+    bounds: Bounds
+    grid_sum: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npy")
+    grid_count: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npy")
 
 
 class Catalog(BaseModel):
     params: Parameters
     cloud_files: list[File[laspy.LasData]] = Field(
-        reader=read_las, ext="laz", path="raw_clouds"
+        reader=read_las,
+        ext="laz",
+        protocol="github",
+        path="liblas/LDR030828*",
+        # path="raw_clouds",
     )
     clouds: list[Cloud]
-    cloud_bounds: list[Bounds]
     bounds: Bounds
-    grid_sums: list[File[np.ndarray]] = Field(
-        reader=read_npz, writer=write_npz, ext="npy"
-    )
-    grid_counts: list[File[np.ndarray]] = Field(
-        reader=read_npz, writer=write_npz, ext="npy"
-    )
     heightmap: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npy")
     heightmap_plot: File[go.Figure] = Field(writer=write_plotly_png, ext="png")

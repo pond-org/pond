@@ -1,2 +1,6 @@
 dir:
   path: storage
+
+github:
+  org: PDAL
+  repo: data

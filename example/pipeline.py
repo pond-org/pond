@@ -5,22 +5,19 @@ import plotly.graph_objects as go
 import plotly.express as px
 import laspy
 
-from pond import State, File, Field, node, pipe, index_files
+from pond import node, pipe, index_files
 from pond.transforms.transform_pipe import TransformPipe
 
-from example.catalog import Catalog, Cloud, Point, Bounds
+from example.catalog import Catalog, Point, Bounds
 
 
-@node(Catalog, "file:cloud_files[:]", "clouds[:]")
-def parse_clouds(cloud_file: laspy.LasData) -> Cloud:
+@node(Catalog, "file:cloud_files[:]", "clouds[:].points")
+def parse_clouds(cloud_file: laspy.LasData) -> list[Point]:
     """Turn the cloud files into a pond-friendly format"""
-    points = [
-        Point(x=point[0], y=point[1], z=point[2]) for point in cloud_file.xyz[::20]
-    ]
-    return Cloud(points=points)
+    return [Point(x=point[0], y=point[1], z=point[2]) for point in cloud_file.xyz[::20]]
 
 
-@node(Catalog, "table:clouds[:].points", "cloud_bounds[:]")
+@node(Catalog, "table:clouds[:].points", "clouds[:].bounds")
 def compute_cloud_bounds(cloud: pa.Table) -> Bounds:
     """Compute bounds for individual clouds"""
     min_max_x = pc.min_max(cloud["x"])
@@ -33,7 +30,7 @@ def compute_cloud_bounds(cloud: pa.Table) -> Bounds:
     )
 
 
-@node(Catalog, "cloud_bounds", "bounds")
+@node(Catalog, "clouds[:].bounds", "bounds")
 def compute_bounds(cloud_bounds: list[Bounds]) -> Bounds:
     """Combine individual bounds into global bounds"""
     bounds = Bounds(minx=np.inf, maxx=-np.inf, miny=np.inf, maxy=-np.inf)
@@ -48,7 +45,7 @@ def compute_bounds(cloud_bounds: list[Bounds]) -> Bounds:
 @node(
     Catalog,
     ["params.res", "table:clouds[:].points", "bounds"],
-    ["file:grid_sums[:]", "file:grid_counts[:]"],
+    ["file:clouds[:].grid_sum", "file:clouds[:].grid_count"],
 )
 def compute_cloud_heightmap(
     res: float, cloud: pa.Table, bounds: Bounds
@@ -72,7 +69,9 @@ def compute_cloud_heightmap(
     return sums, counts
 
 
-@node(Catalog, ["file:grid_sums", "file:grid_counts"], "file:heightmap")
+@node(
+    Catalog, ["file:clouds[:].grid_sum", "file:clouds[:].grid_count"], "file:heightmap"
+)
 def compute_heightmap(sums: list[np.ndarray], counts: list[np.ndarray]) -> np.ndarray:
     """Combine individual heightmaps into global heightmap"""
     count = sum(counts)
@@ -100,7 +99,7 @@ def preprocessing() -> TransformPipe:
             index_files(Catalog, "cloud_files"),
             parse_clouds,
         ],
-        output="clouds",
+        output="clouds[:].points",
     )
 
 
@@ -108,6 +107,8 @@ def heightmap_pipe() -> TransformPipe:
     return pipe(
         [
             preprocessing(),
+            # index_files(Catalog, "cloud_files"),
+            # parse_clouds,
             compute_cloud_bounds,
             compute_bounds,
             compute_cloud_heightmap,

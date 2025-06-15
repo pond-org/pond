@@ -218,7 +218,13 @@ class Lens(LensInfo):
             print(f"Checking fs path {file_path}")
             print("Protocol: ", protocol)
             fs = fsspec.filesystem(**self.volume_protocol_args[protocol])
-            listing = fs.ls(file_path, detail=True)
+            # if wildcard, use glob instead
+            if "*" in file_path:
+                listing_dict = fs.glob(file_path, detail=True)
+                listing = list(listing_dict.values())
+            else:
+                listing = fs.ls(file_path, detail=True)
+            print("FOUND the following files: ", listing)
             values = []
             for info in listing:
                 print(info["name"][-(len(ext) + 1) :])
@@ -264,7 +270,12 @@ class Lens(LensInfo):
             )
             if not fs.exists(file_path):
                 return
-            listing = fs.ls(file_path, detail=True)
+            if "*" in file_path:
+                listing_dict = fs.glob(file_path, detail=True)
+                listing = list(listing_dict.values())
+            else:
+                listing = fs.ls(file_path, detail=True)
+            print("FOUND the following files: ", listing)
             counter = 0
             for info in listing:
                 if info["type"] == "directory":
@@ -300,6 +311,7 @@ class Lens(LensInfo):
             ext = extra_args["ext"]
             protocol = extra_args["protocol"] or self.default_volume_protocol
             fs = fsspec.filesystem(**self.volume_protocol_args[protocol])
+            print(f"Using {protocol} to read {model.path}.{ext}")
             model.object = reader(fs, f"{model.path}.{ext}")
         elif isinstance(model, list):
             for i, value in enumerate(model):
