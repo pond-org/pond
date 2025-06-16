@@ -3,7 +3,7 @@ import pytest
 from pond import State
 from pond.catalogs.abstract_catalog import LensPath
 from pond.transforms.transform_index import TransformIndex
-from tests.test_file_utils import FileCatalog
+from tests.test_file_utils import FileCatalog, catalog  # noqa: F401
 
 
 def test_get_file_paths():
@@ -29,7 +29,12 @@ def test_get_file_paths():
     ("data_catalog_fixture",),
     [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
-def test_transform_index(request, catalog, filled_storage, data_catalog_fixture):
+def test_transform_index(
+    request,
+    catalog,  # noqa: F811
+    filled_storage,
+    data_catalog_fixture,
+):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
     volume_protocol_args = {"dir": {"path": filled_storage}}
     state = State(FileCatalog, data_catalog, volume_protocol_args=volume_protocol_args)

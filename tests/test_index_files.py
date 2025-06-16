@@ -1,14 +1,19 @@
 import pytest
 
 from pond import Lens, State
-from tests.test_file_utils import FileCatalog
+from tests.test_file_utils import FileCatalog, catalog  # noqa: F401
 
 
 @pytest.mark.parametrize(
     ("data_catalog_fixture",),
     [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
-def test_index_files(request, catalog, filled_storage, data_catalog_fixture):
+def test_index_files(
+    request,
+    catalog,  # noqa: F811
+    filled_storage,
+    data_catalog_fixture,
+):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
     # storage_path = tmp_path_factory.mktemp("storage")
     volume_protocol_args = {"dir": {"path": filled_storage}}
@@ -80,7 +85,12 @@ def test_index_files(request, catalog, filled_storage, data_catalog_fixture):
     ("data_catalog_fixture",),
     [("empty_iceberg_catalog",), ("empty_lance_catalog",), ("empty_delta_catalog",)],
 )
-def test_state_index_files(request, catalog, filled_storage, data_catalog_fixture):
+def test_state_index_files(
+    request,
+    catalog,  # noqa: F811
+    filled_storage,
+    data_catalog_fixture,
+):
     data_catalog = request.getfixturevalue(data_catalog_fixture)
     volume_protocol_args = {"dir": {"path": filled_storage}}
 

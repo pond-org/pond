@@ -1,4 +1,5 @@
 import os
+import pickle
 
 import lance
 import pyarrow as pa
@@ -131,3 +132,51 @@ def write_iceberg_dataset(catalog, iceberg_catalog):
     #     data, os.path.join(db_path, "test.lance"), schema=schema, mode="overwrite"
     # )
     # return ds
+
+
+@pytest.fixture
+def filled_storage(tmp_path_factory, catalog):
+    storage_path = tmp_path_factory.mktemp("storage")
+
+    for i, image in enumerate(catalog.images):
+        os.makedirs(os.path.join(storage_path, "catalog", "images"), exist_ok=True)
+        image.get().save(
+            os.path.join(storage_path, "catalog", "images", f"test_{i}.png")
+        )
+    os.makedirs(os.path.join(storage_path, "catalog"), exist_ok=True)
+    catalog.image.get().save(os.path.join(storage_path, "catalog", "image.png"))
+
+    for i, drive in enumerate(catalog.drives):
+        navs = drive.navigation.get()
+        images = drive.images.get()
+        os.makedirs(
+            os.path.join(storage_path, "catalog", "drives", f"test_{i}"), exist_ok=True
+        )
+        with open(
+            os.path.join(
+                storage_path, "catalog", "drives", f"test_{i}", "navigation.pickle"
+            ),
+            "wb",
+        ) as f:
+            pickle.dump(
+                navs,
+                f,
+            )
+        with open(
+            os.path.join(
+                storage_path, "catalog", "drives", f"test_{i}", "images.pickle"
+            ),
+            "wb",
+        ) as f:
+            pickle.dump(
+                images,
+                f,
+            )
+
+    with open(
+        os.path.join(storage_path, "catalog", "values.pickle"),
+        "wb",
+    ) as f:
+        pickle.dump(catalog.values.get(), f)
+
+    return storage_path
