@@ -42,7 +42,6 @@ class DeltaCatalog(AbstractCatalog):
     ) -> bool:
         fs_path = path.to_fspath(level=len(path.path))
         mode = "append" if append else "overwrite"
-        print(f"Writing {fs_path} delta with schhema: {schema}")
         if False:  # per_row:
             write_deltalake(
                 os.path.join(self.db_path, f"{fs_path}"),
@@ -104,7 +103,6 @@ class DeltaCatalog(AbstractCatalog):
         # ds = lance.dataset(fs_path)
         delta_table = DeltaTable(fs_path, self.storage_options)
         indices = [offset] if offset is not None else [0]
-        print(f"Getting {query} from {fs_path}")
         if query:
             if offset is not None:
                 table = delta_table.to_pyarrow_dataset().take(
@@ -113,7 +111,6 @@ class DeltaCatalog(AbstractCatalog):
             else:
                 table = delta_table.to_pyarrow_table(columns={"value": pc.field(query)})
         elif offset is not None:
-            print("INDEX!")
             # table = delta_table.to_pyarrow_table(filters=[("index", "=", str(offset))])
             table = delta_table.to_pyarrow_dataset().take(
                 indices=indices,

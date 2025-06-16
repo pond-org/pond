@@ -62,7 +62,6 @@ class ParallelRunner(AbstractRunner):
                         )
                     }
                     logger.info(f"Found {len(ready)} nodes to execute")
-                    print([transforms[t].get_name() for t in ready])
                     todo -= ready
                     for t in ready:
                         transform = transforms[t]
@@ -71,7 +70,6 @@ class ParallelRunner(AbstractRunner):
                         execute_units = transform.get_execute_units(state)
                         execute_units_finished[t] = len(execute_units)
                         for unit in execute_units:
-                            print("ADDING future with inputs: ", unit.get_inputs())
                             futures.add(
                                 pool.submit(
                                     execute_unit,
@@ -84,7 +82,6 @@ class ParallelRunner(AbstractRunner):
 
                     if not futures:
                         logger.info("No futures left in pool, stopping...")
-                        print([transforms[t].get_name() for t in todo])
                         break
 
                     done, futures = wait(
@@ -95,7 +92,6 @@ class ParallelRunner(AbstractRunner):
                         try:
                             # unit, rtns, t = future.result()
                             unit, t = future.result()
-                            print("SAVING: ", unit.get_outputs())
                             # unit.save_outputs(state, rtns)
                         except Exception as e:
                             error = e
@@ -108,15 +104,12 @@ class ParallelRunner(AbstractRunner):
                             ) from error
 
                         execute_units_finished[t] = execute_units_finished[t] - 1
-                        print(transform.get_name(), ": ", execute_units_finished[t])
                         if execute_units_finished[t] == 0:
                             transform = transforms[t]
                             for hook in hooks:
                                 hook.post_node_execute(transform, success, error)
-                            print("PRODUCED BY ", transform.get_name())
                             for o in transform.get_outputs():
                                 produced.append(o)
-                                print("Produced: ", o)
 
         for hook in hooks:
             hook.post_pipe_execute(pipe, success, error)

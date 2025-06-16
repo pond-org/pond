@@ -278,7 +278,6 @@ def add_dependency(
 ):
     for transform in transforms:
         outputs = transform.get_outputs()
-        # print(f"Transform {transform.get_name()} outputs: {outputs}")
         for o in outputs:
             if path.subset_of(o):
                 dependencies[transform_name].add(transform.get_name())
@@ -402,13 +401,11 @@ class UIHook(AbstractHook):
             self.seed = random.random()
         logger.debug("post_graph_construct")
         self.dependencies = compute_dependencies(transforms, inputs)
-        print(self.dependencies)
         fg_id = id(transforms)
         if fg_id in self.dag_template_id_cache:
             logger.warning("Skipping creation of DAG template as it already exists.")
             return
         module_hash = str(random.getrandbits(128))  # driver._get_modules_hash(modules)
-        print("Module hash: ", module_hash)
         vcs_info = _derive_version_control_info(module_hash)
         dag_hash = str(random.getrandbits(128))  # driver.hash_dag(graph)
         code_hash = str(

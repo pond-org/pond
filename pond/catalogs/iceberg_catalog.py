@@ -66,35 +66,27 @@ class IcebergCatalog(AbstractCatalog):
             p.name if p.index is None else f"{p.name}[{p.index}]" for p in path.path
         ]
         index = None
-        print("Getting ident for ", path.path, ":", names)
         found = False
         for level in reversed(range(1, len(path.path) + 1)):
-            print("At level ", level)
             # namespace = ".".join(names[: level - 1])
             identifier = ".".join(names[: level + 1])
             query = path.path[level:]  # if level > 1 else []
-            print(identifier, query)
             if self.catalog.table_exists(identifier):
-                print(f"{identifier} does exist!")
                 found = True
                 break
             index = path.path[level - 1].index
             if index is None:
-                print(f"{identifier} does not exist!")
                 continue
 
             # we want to see if x.example as well as x.example[0]
             identifier = ".".join(names[:level] + [path.path[level - 1].name])
             if self.catalog.table_exists(identifier):
-                print(f"{identifier} does exist!")
                 found = True
                 break
             index = None
-            print(f"{identifier} does not exist!")
         if not found:
             return None, False
         iceberg_table = self.catalog.load_table(identifier)
-        print(iceberg_table.scan().to_arrow())
         if query:
             # iceberg queries can not be done
             # on index, so we need to get all entries

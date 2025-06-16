@@ -77,7 +77,6 @@ class TransformList(Transform):
                 list_index += 1
             input_lengths[name] = list_index
 
-        print(input_lengths)
         unique_inputs = set(input_lengths.values())
         assert (
             len(unique_inputs) == 1
@@ -98,7 +97,6 @@ class TransformList(Transform):
             inputs = []
             for i, path_index in zip(self.input_lenses.values(), self.input_inds):
                 if path_index != -1:
-                    print(i)
                     i.set_index(path_index, index)
                     inputs.append(i.lens_path.clone())
                     i.set_index(path_index, -1)

@@ -119,8 +119,6 @@ class ExecuteTransform(AbstractExecuteUnit):
     def commit(self, state: State, values: list[Any]) -> bool:
         for val, o in zip(values, self.outputs):
             append = o in self.append_outputs
-            if append:
-                print(f"WILL APPEND TO {o.to_path()}")
             state.lens(o.to_path()).write_table(val, append)
         return True
 

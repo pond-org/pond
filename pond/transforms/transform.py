@@ -63,7 +63,6 @@ class Transform(AbstractExecuteTransform):
             except StopIteration:
                 wildcard_index = -1
             try:
-                print("Type: ", input_lens.get_type())
                 input_lens_type = input_lens.get_type()
                 if is_list_fold and wildcard_index != -1:
                     input_lens_type = list[input_lens_type]
@@ -71,7 +70,6 @@ class Transform(AbstractExecuteTransform):
                 assert (
                     type_checks
                 ), f"Input {input_name} of type {input_type} does not agree with catalog entry {input_field_name} with type {input_lens.get_type()}"
-                print(f"{input_lens.get_type()} checks with {input_type}!")
             except BeartypeDoorNonpepException as m:
                 warnings.warn(str(m))
 
@@ -83,7 +81,6 @@ class Transform(AbstractExecuteTransform):
                 assert (
                     type_checks
                 ), f"Output of type {output_type} does not agree with catalog entry {output_field_name} with type {output_lens.get_type()}"
-                print(f"{output_lens.get_type()} checks with {output_type}!")
             except BeartypeDoorNonpepException as m:
                 warnings.warn(str(m))
 

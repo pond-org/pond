@@ -74,7 +74,6 @@ class LensPath:
 
     def __eq__(self, other: Self) -> bool:
         equal = self.path == other.path
-        # print(f"{self.path}=={other.path}? {equal}")
         return equal
 
     def subset_of(self, other: Self) -> bool:
@@ -83,7 +82,6 @@ class LensPath:
         subset = all(
             a.subset_of(b) for a, b in zip(self.path[: len(other.path)], other.path)
         )
-        # print(f"{self.path} subset_of {other.path}? {subset}")
         return subset
 
     def get_db_query(self, level: int = 1, dot_accessor: bool = False) -> str:

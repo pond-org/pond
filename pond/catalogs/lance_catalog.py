@@ -78,9 +78,7 @@ class LanceCatalog(AbstractCatalog):
         if not found:
             return None, False
         ds = lance.dataset(fs_path)
-        print(f"Getting {query} from {fs_path}")
         if query:
-            print("Table: ", ds.to_table())
             table = ds.to_table(offset=offset, limit=limit, columns={"value": query})
             # return type.parse_obj(table.to_pylist()[0]["value"])
         else:

@@ -28,7 +28,6 @@ def get_file_paths(path: list[TypeField], model_type: Type) -> list[LensPath]:
     ):
         return [LensPath(path)]
     elif get_origin(model_type) is list:
-        print(f"Checking list: {path}")
         item_type = get_args(model_type)[0]
         file_paths = get_file_paths(path, item_type)
         # if any items in a list might be a file, we need
@@ -36,7 +35,6 @@ def get_file_paths(path: list[TypeField], model_type: Type) -> list[LensPath]:
         if file_paths:
             return [LensPath(path)]
     elif issubclass(model_type, BaseModel):
-        print(f"Checking model: {path}")
         file_paths = []
         for field in model_type.model_fields:
             field_type = model_type.model_fields[field].annotation
