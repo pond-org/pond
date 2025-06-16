@@ -3,13 +3,7 @@ import pytest
 from pond import State
 from pond.catalogs.abstract_catalog import LensPath
 from pond.transforms.transform_index import TransformIndex
-
-from tests.test_utils import (
-    empty_iceberg_catalog,
-    empty_lance_catalog,
-    empty_delta_catalog,
-)
-from tests.test_file_utils import FileCatalog, catalog, filled_storage
+from tests.test_file_utils import FileCatalog
 
 
 def test_get_file_paths():
@@ -46,12 +40,12 @@ def test_transform_index(request, catalog, filled_storage, data_catalog_fixture)
     assert value.path == "catalog/image"
     src = catalog.image.get()
     target = value.get()
-    assert (
-        target.mode == src.mode
-    ), f"got mode {repr(target.mode)}, expected {repr(src.mode)}"
-    assert (
-        target.size == src.size
-    ), f"got size {repr(target.size)}, expected {repr(src.size)}"
+    assert target.mode == src.mode, (
+        f"got mode {repr(target.mode)}, expected {repr(src.mode)}"
+    )
+    assert target.size == src.size, (
+        f"got size {repr(target.size)}, expected {repr(src.size)}"
+    )
     assert target.tobytes() == src.tobytes()
 
     value = state["images"]
@@ -59,12 +53,12 @@ def test_transform_index(request, catalog, filled_storage, data_catalog_fixture)
         assert value[i].path == f"catalog/images/test_{i}"
         src = image.get()
         target = value[i].get()
-        assert (
-            target.mode == src.mode
-        ), f"got mode {repr(target.mode)}, expected {repr(src.mode)}"
-        assert (
-            target.size == src.size
-        ), f"got size {repr(target.size)}, expected {repr(src.size)}"
+        assert target.mode == src.mode, (
+            f"got mode {repr(target.mode)}, expected {repr(src.mode)}"
+        )
+        assert target.size == src.size, (
+            f"got size {repr(target.size)}, expected {repr(src.size)}"
+        )
         assert target.tobytes() == src.tobytes()
 
     value = state["values"]

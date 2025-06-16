@@ -1,8 +1,7 @@
-from typing import Generic, TypeVar, Callable
+from typing import Callable, Generic, TypeVar
 
 import pydantic
 from pydantic import BaseModel, ConfigDict
-
 
 DataT = TypeVar("DataT")
 
@@ -35,7 +34,7 @@ def Field(
     path=None,
     protocol=None,
     json_schema_extra={},
-    **kwargs
+    **kwargs,
 ):
     json_schema_extra = {
         "reader": reader,

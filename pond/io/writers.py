@@ -1,10 +1,10 @@
-from typing import Any
 import pickle
+from typing import Any
 
-import numpy as np
-from PIL import Image
 import laspy
+import numpy as np
 import plotly.graph_objects as go
+from PIL import Image
 
 
 def write_pickle(object: Any, fs, path: str):

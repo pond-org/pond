@@ -1,14 +1,13 @@
+import laspy
 import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
 import pyarrow as pa
 import pyarrow.compute as pc
-import plotly.graph_objects as go
-import plotly.express as px
-import laspy
 
-from pond import node, pipe, index_files
+from example.catalog import Bounds, Catalog, Point
+from pond import index_files, node, pipe
 from pond.transforms.transform_pipe import TransformPipe
-
-from example.catalog import Catalog, Point, Bounds
 
 
 @node(Catalog, "file:cloud_files[:]", "clouds[:].points")

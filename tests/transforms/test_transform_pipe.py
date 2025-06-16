@@ -1,19 +1,9 @@
 import pytest
 
-from pond.lens import Lens
+from conf.catalog import Catalog, Drive, Navigation
 from pond.state import State
 from pond.transforms.transform import Transform
 from pond.transforms.transform_pipe import TransformPipe
-from conf.catalog import Catalog, Drive, Navigation
-
-from tests.test_utils import (
-    catalog,
-    filled_iceberg_catalog,
-    filled_lance_catalog,
-    empty_iceberg_catalog,
-    empty_lance_catalog,
-    empty_delta_catalog,
-)
 
 
 def nav_to_float(value: list[Navigation]) -> list[float]:

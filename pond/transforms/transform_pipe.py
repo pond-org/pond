@@ -1,7 +1,7 @@
 from pond.lens import LensPath, get_cleaned_path
 from pond.transforms.abstract_transform import (
-    AbstractTransform,
     AbstractExecuteTransform,
+    AbstractTransform,
 )
 
 # from pond.transform import Transform
@@ -29,19 +29,19 @@ class TransformPipe(AbstractTransform):
         for transform in transforms:
             for i in transform.get_inputs():
                 # assert i in produced
-                assert any(
-                    i.subset_of(p) for p in produced
-                ), f"Input {i.to_path()} not in inputs or produced!"
+                assert any(i.subset_of(p) for p in produced), (
+                    f"Input {i.to_path()} not in inputs or produced!"
+                )
             for o in transform.get_outputs():
                 # assert o not in produced
-                assert all(
-                    not o.subset_of(p) for p in produced
-                ), f"Output {o.to_path()} already in inputs or produced!"
+                assert all(not o.subset_of(p) for p in produced), (
+                    f"Output {o.to_path()} already in inputs or produced!"
+                )
                 produced.append(o)
         for o in self.outputs:
-            assert (
-                o in produced
-            ), f"{o.to_path()} not in {[r.to_path() for r in self.outputs]}"
+            assert o in produced, (
+                f"{o.to_path()} not in {[r.to_path() for r in self.outputs]}"
+            )
 
     def get_inputs(self) -> list[LensPath]:
         return self.inputs

@@ -1,25 +1,14 @@
 # import pond
 
-import pytest
-
-import pyarrow as pa
 import lance
 import lancedb
+import pyarrow as pa
+import pytest
 
+import pond.lens
+from conf.catalog import Catalog, Drive, Navigation, Values
 from pond import Lens
 from pond.lens import TypeField
-import pond.lens
-from tests.test_utils import (
-    catalog,
-    filled_iceberg_catalog,
-    filled_lance_catalog,
-    filled_delta_catalog,
-    empty_iceberg_catalog,
-    empty_lance_catalog,
-    empty_delta_catalog,
-)
-
-from conf.catalog import Catalog, Drive, Navigation, Values
 
 
 @pytest.mark.skip(reason="no way of currently testing this")

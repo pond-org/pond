@@ -1,14 +1,7 @@
 import pytest
-
 from pydantic import BaseModel
 
-from pond import State, pipe, construct
-
-from tests.test_utils import (
-    empty_iceberg_catalog,
-    empty_lance_catalog,
-    empty_delta_catalog,
-)
+from pond import State, construct, pipe
 
 
 @pytest.mark.parametrize(

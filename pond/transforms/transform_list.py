@@ -2,12 +2,9 @@ from typing import Callable, Type
 
 from pydantic import BaseModel
 
-from pond.state import State
 from pond.lens import LensPath, TypeField
-from pond.transforms.abstract_transform import (
-    AbstractExecuteUnit,
-    ExecuteTransform,
-)
+from pond.state import State
+from pond.transforms.abstract_transform import AbstractExecuteUnit, ExecuteTransform
 from pond.transforms.transform import Transform
 
 
@@ -37,7 +34,7 @@ class TransformList(Transform):
                 index = -1
             self.input_inds.append(index)
         if not wildcard:
-            raise ValueError(f"Transform list did not get any inputs with wildcard!")
+            raise ValueError("Transform list did not get any inputs with wildcard!")
         wildcard = False
         for output_lens in self.output_lenses.values():
             try:
@@ -51,7 +48,7 @@ class TransformList(Transform):
                 index = -1
             self.output_inds.append(index)
         if not wildcard:
-            raise ValueError(f"Transform list did not get any outputs with wildcard!")
+            raise ValueError("Transform list did not get any outputs with wildcard!")
 
     def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:
         input_lengths = {}
@@ -78,9 +75,9 @@ class TransformList(Transform):
             input_lengths[name] = list_index
 
         unique_inputs = set(input_lengths.values())
-        assert (
-            len(unique_inputs) == 1
-        ), f"Input lengths are not the same: {input_lengths}"
+        assert len(unique_inputs) == 1, (
+            f"Input lengths are not the same: {input_lengths}"
+        )
         length = unique_inputs.pop()
 
         for o, path_index in zip(self.output_lenses.values(), self.output_inds):

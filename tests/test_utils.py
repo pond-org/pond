@@ -1,16 +1,15 @@
 import os
-import pytest
 
-import pyarrow as pa
 import lance
+import pyarrow as pa
+import pytest
 from deltalake import write_deltalake
 
-from pond.catalogs.lance_catalog import LanceCatalog
-from pond.catalogs.iceberg_catalog import IcebergCatalog
-from pond.catalogs.delta_catalog import DeltaCatalog
 import pond.lens
-
 from conf.catalog import Catalog, Drive, Navigation, Values
+from pond.catalogs.delta_catalog import DeltaCatalog
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.catalogs.lance_catalog import LanceCatalog
 
 
 @pytest.fixture

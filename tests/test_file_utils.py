@@ -1,16 +1,15 @@
 import os
 import pickle
+
 import pytest
-
-from pydantic import BaseModel
 from PIL import Image
-
-from pond.field import File, Field
-from pond.io.readers import read_image, read_pickle
-from pond.io.writers import write_image, write_pickle
+from pydantic import BaseModel
 
 from conf.catalog import Navigation, Values
 from conf.file_catalog import FileDrive
+from pond.field import Field, File
+from pond.io.readers import read_image, read_pickle
+from pond.io.writers import write_image, write_pickle
 
 
 class FileCatalog(BaseModel):

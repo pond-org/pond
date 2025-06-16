@@ -1,20 +1,14 @@
-from typing import List, Type, Any, get_args, get_origin
-
 import datetime
+from typing import Any, List, Type, get_args, get_origin
 
-from pydantic import BaseModel, NaiveDatetime
-from parse import parse
-
-import pydantic_to_pyarrow
-from pydantic._internal import _generics
-import pyarrow as pa
 import fsspec
+import pyarrow as pa
+import pydantic_to_pyarrow
+from parse import parse
+from pydantic import BaseModel, NaiveDatetime
+from pydantic._internal import _generics
 
-from pond.catalogs.abstract_catalog import (
-    TypeField,
-    LensPath,
-    AbstractCatalog,
-)
+from pond.catalogs.abstract_catalog import AbstractCatalog, LensPath, TypeField
 from pond.field import File
 
 # NOTE: this does not require the root_type but we
@@ -36,7 +30,7 @@ def get_pyarrow_schema(t: Type) -> pa.Schema:
     )
     metadata = {}
     # return pydantic_to_pyarrow.schema._get_pyarrow_type()
-    if get_origin(t) == list:
+    if get_origin(t) is list:
         t = get_args(t)[0]
 
     if not issubclass(t, BaseModel):
@@ -109,9 +103,9 @@ class LensInfo:
 
     def set_index(self, index: int, value: int):
         assert index >= 0
-        assert (
-            self.lens_path.path[index].index is not None
-        ), "Lens only supports setting index for list item lenses"
+        assert self.lens_path.path[index].index is not None, (
+            "Lens only supports setting index for list item lenses"
+        )
         assert value >= 0 or value == -1
         self.lens_path.path[index].index = value
 
@@ -119,7 +113,7 @@ class LensInfo:
         if self.lens_path.variant == "default":
             return self.type
         elif self.lens_path.variant == "file":
-            if get_origin(self.type) == list:
+            if get_origin(self.type) is list:
                 item_type = get_args(self.type)[0]
                 assert issubclass(item_type, File)
                 return list[_generics.get_args(item_type)[0]]
@@ -214,8 +208,7 @@ class Lens(LensInfo):
             values = []
             for info in listing:
                 if (
-                    info["type"]
-                    == "file"
+                    info["type"] == "file"
                     # and self.fs.path.splitext(info["name"][-(len(ext) + 1) :] == f".{ext}"
                 ):
                     item_path = info["name"]  # [len(str(self.storage_path)) + 1 :]
@@ -290,7 +283,7 @@ class Lens(LensInfo):
         # the scalar ones are just one element list, just
         # need to assert length 1 and get the first element on return
         rtn: None | list[BaseModel] | BaseModel = None
-        if get_origin(self.type) == list:
+        if get_origin(self.type) is list:
             field_type = get_args(self.type)[0]
             if issubclass(field_type, BaseModel):
                 sub_table = table["value"] if is_query else table
@@ -352,7 +345,7 @@ class Lens(LensInfo):
             if _generics.get_origin(self.type) == File:
                 return rtn.get()
             elif (
-                get_origin(self.type) == list
+                get_origin(self.type) is list
                 and _generics.get_origin(get_args(self.type)[0]) == File
             ):
                 return [r.get() for r in rtn]
@@ -376,7 +369,7 @@ class Lens(LensInfo):
             ):
                 return False
             for i, value in enumerate(model[1:]):
-                self.set_file_paths(f"{path}/{i+1}", value, extra_args)
+                self.set_file_paths(f"{path}/{i + 1}", value, extra_args)
             return True
         elif isinstance(model, BaseModel):
             found = False
@@ -398,23 +391,23 @@ class Lens(LensInfo):
             if _generics.get_origin(self.type) == File:
                 value = File.set(value)
             elif (
-                get_origin(self.type) == list
+                get_origin(self.type) is list
                 and _generics.get_origin(get_args(self.type)[0]) == File
             ):
                 value = [File.set(v) for v in value]
             else:
                 raise RuntimeError("pond requires file variant to have type File")
         elif self.lens_path.variant == "table":
-            assert isinstance(
-                value, pa.Table
-            ), "pond requires table variant to use a pyarrow table"
+            assert isinstance(value, pa.Table), (
+                "pond requires table variant to use a pyarrow table"
+            )
             return value
 
         # NOTE: table does not handle files
         self.set_file_paths(self.lens_path.to_volume_path(), value, self.extra_args)
 
         # TODO: this should be a recursive function instead
-        if get_origin(self.type) == list:
+        if get_origin(self.type) is list:
             field_type = get_args(field_type)[0]
             if len(value) == 0:
                 # raise RuntimeError("pond can not yet write empty lists")

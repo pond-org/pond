@@ -1,15 +1,14 @@
 import warnings
 from collections import OrderedDict
-from typing import Callable, Type, get_type_hints, get_args, Self, Tuple
+from typing import Callable, Self, Tuple, Type, get_args, get_type_hints
 
-from pydantic import BaseModel
 from beartype.door import is_subhint
 from beartype.roar import BeartypeDoorNonpepException
+from pydantic import BaseModel
 
-from pond.state import State
 from pond.lens import LensInfo, LensPath
-from pond.transforms.abstract_transform import (
-    # AbstractTransform,
+from pond.state import State
+from pond.transforms.abstract_transform import (  # AbstractTransform,
     AbstractExecuteTransform,
     AbstractExecuteUnit,
     ExecuteTransform,
@@ -41,7 +40,7 @@ class Transform(AbstractExecuteTransform):
         try:
             output_types = types.pop("return")
         except KeyError as e:
-            raise RuntimeError(f"Transform does not have return type!") from e
+            raise RuntimeError("Transform does not have return type!") from e
         try:
             if is_subhint(output_types, Tuple):
                 output_types = list(get_args(output_types))
@@ -67,9 +66,9 @@ class Transform(AbstractExecuteTransform):
                 if is_list_fold and wildcard_index != -1:
                     input_lens_type = list[input_lens_type]
                 type_checks = is_subhint(input_lens_type, input_type)
-                assert (
-                    type_checks
-                ), f"Input {input_name} of type {input_type} does not agree with catalog entry {input_field_name} with type {input_lens.get_type()}"
+                assert type_checks, (
+                    f"Input {input_name} of type {input_type} does not agree with catalog entry {input_field_name} with type {input_lens.get_type()}"
+                )
             except BeartypeDoorNonpepException as m:
                 warnings.warn(str(m))
 
@@ -78,9 +77,9 @@ class Transform(AbstractExecuteTransform):
         ):
             try:
                 type_checks = is_subhint(output_lens.get_type(), output_type)
-                assert (
-                    type_checks
-                ), f"Output of type {output_type} does not agree with catalog entry {output_field_name} with type {output_lens.get_type()}"
+                assert type_checks, (
+                    f"Output of type {output_type} does not agree with catalog entry {output_field_name} with type {output_lens.get_type()}"
+                )
             except BeartypeDoorNonpepException as m:
                 warnings.warn(str(m))
 

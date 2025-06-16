@@ -1,9 +1,9 @@
-import numpy as np
-from typing import Any
 import pickle
+from typing import Any
 
-from PIL import Image
 import laspy
+import numpy as np
+from PIL import Image
 
 
 def read_pickle(fs, path: str) -> Any:

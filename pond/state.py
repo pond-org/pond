@@ -1,10 +1,9 @@
-import os
-from typing import Type, Any
-import yaml
+from typing import Any, Type
 
 from pydantic import BaseModel
-from pond.lens import Lens
+
 from pond.catalogs.abstract_catalog import AbstractCatalog
+from pond.lens import Lens
 
 
 class State:

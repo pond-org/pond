@@ -1,15 +1,8 @@
-import pytest
 import pyarrow as pa
+import pytest
 
-from conf.table_catalog import TableCatalog, Car
-
-from pond.field import File
+from conf.table_catalog import Car, TableCatalog
 from pond import Lens
-from tests.test_utils import (
-    empty_iceberg_catalog,
-    empty_lance_catalog,
-    empty_delta_catalog,
-)
 
 
 @pytest.fixture

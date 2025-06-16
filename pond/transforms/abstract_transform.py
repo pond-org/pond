@@ -1,17 +1,16 @@
 from abc import ABC
-from typing import NewType, Callable, Type, Any
-import dill
+from typing import Any, Callable, NewType, Type
 
+import dill
 from pydantic import BaseModel
 
-from pond.lens import LensPath, LensInfo
+from pond.lens import LensInfo, LensPath
 from pond.state import State
 
 AbstractExecuteTransform = NewType("AbstractExecuteTransform", None)
 
 
 class AbstractTransform(ABC):
-    
     def get_input_types(self, root_type: Type[BaseModel]) -> dict[str, Type]:
         return [LensInfo(root_type, p).get_type() for p in self.get_inputs()]
 
@@ -74,7 +73,7 @@ class ExecuteTransform(AbstractExecuteUnit):
         # input_list_len: int = -1,
     ):
         super().__init__(inputs, outputs)
-        self.fn = fn #wrapper
+        self.fn = fn  # wrapper
         self.append_outputs = append_outputs
         # self.input_list_len = input_list_len
 
@@ -89,7 +88,7 @@ class ExecuteTransform(AbstractExecuteUnit):
         for i in self.inputs:
             try:
                 index = next(ind for ind, v in enumerate(i.path) if v.index == -1)
-                parent = LensPath(i.path[:index+1])
+                parent = LensPath(i.path[: index + 1])
                 parent.path[-1].index = None
                 value = state[parent.to_path()]
                 if value is not None:
@@ -104,7 +103,7 @@ class ExecuteTransform(AbstractExecuteUnit):
                     input_list.append(value)
                 args.append(input_list)
             except StopIteration:
-                args.append(state[i.to_path()]) 
+                args.append(state[i.to_path()])
                 continue
             # if self.input_list_len == -1:
             #     raise ValueError("Need to provide list len for execute transform to provide list inputs!")

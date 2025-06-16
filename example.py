@@ -1,16 +1,14 @@
 import argparse
 
+from example.catalog import Catalog
+from example.pipeline import heightmap_pipe
 from pond import State
-
 from pond.catalogs.iceberg_catalog import IcebergCatalog
 from pond.catalogs.lance_catalog import LanceCatalog
 from pond.hooks.ui_hook import UIHook
-from pond.runners.sequential_runner import SequentialRunner
 from pond.runners.parallel_runner import ParallelRunner
+from pond.runners.sequential_runner import SequentialRunner
 from pond.volume import load_volume_protocol_args
-
-from example.catalog import Catalog
-from example.pipeline import heightmap_pipe
 
 
 def main(args):

@@ -1,7 +1,7 @@
 import os
 
-import pyarrow as pa
 import lance
+import pyarrow as pa
 
 from pond.catalogs.abstract_catalog import AbstractCatalog, LensPath
 

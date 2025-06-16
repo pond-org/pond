@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Type, Optional
+from typing import Optional, Type
 
 from pydantic import BaseModel
 

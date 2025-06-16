@@ -1,12 +1,11 @@
-import os
 import copy
-
-from typing import Self
-from dataclasses import dataclass
+import os
 from abc import ABC
+from dataclasses import dataclass
+from typing import Self
 
-from parse import parse
 import pyarrow as pa
+from parse import parse
 
 
 @dataclass
@@ -92,7 +91,7 @@ class LensPath:
             field_accessor = f".{field.name}" if dot_accessor else f"['{field.name}']"
             parts.append(field.name if i == 0 else field_accessor)
             if field.index is not None:
-                parts.append(f"[{field.index+1}]")
+                parts.append(f"[{field.index + 1}]")
         return "".join(parts)
 
     def to_fspath(self, level: int = 1, last_index: bool = True) -> os.PathLike:

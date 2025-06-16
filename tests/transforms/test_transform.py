@@ -4,17 +4,8 @@ from typing import Any
 
 import pytest
 
-from pond import Lens, Transform, State
-from tests.test_utils import (
-    catalog,
-    filled_iceberg_catalog,
-    filled_lance_catalog,
-    empty_iceberg_catalog,
-    empty_lance_catalog,
-    empty_delta_catalog,
-)
-
 from conf.catalog import Catalog, Drive, Navigation
+from pond import Lens, State, Transform
 
 
 def value1_value2(value1: float) -> int:

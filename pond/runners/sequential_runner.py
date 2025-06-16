@@ -1,7 +1,7 @@
+from pond.hooks.abstract_hook import AbstractHook
 from pond.runners.abstract_runner import AbstractRunner
 from pond.state import State
 from pond.transforms.transform_pipe import TransformPipe
-from pond.hooks.abstract_hook import AbstractHook
 
 
 class SequentialRunner(AbstractRunner):

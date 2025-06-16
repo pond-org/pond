@@ -1,13 +1,10 @@
 import os
-from typing import Union, Optional
 from pathlib import Path
+from typing import Optional, Union
 
 import pyarrow as pa
-
 import pyarrow.compute as pc
-
-from deltalake import write_deltalake, DeltaTable
-
+from deltalake import DeltaTable, write_deltalake
 
 from pond.catalogs.abstract_catalog import AbstractCatalog, LensPath
 

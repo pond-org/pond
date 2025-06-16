@@ -1,6 +1,7 @@
 import os
-import yaml
 from typing import Any
+
+import yaml
 
 
 def load_volume_protocol_args() -> dict[str, Any]:

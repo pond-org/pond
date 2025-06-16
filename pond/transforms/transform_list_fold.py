@@ -3,10 +3,7 @@ from typing import Callable, Type
 from pydantic import BaseModel
 
 from pond.state import State
-from pond.transforms.abstract_transform import (
-    AbstractExecuteUnit,
-    ExecuteTransform,
-)
+from pond.transforms.abstract_transform import AbstractExecuteUnit, ExecuteTransform
 from pond.transforms.transform import Transform
 
 
@@ -35,7 +32,7 @@ class TransformListFold(Transform):
                 pass
         if not wildcard:
             raise ValueError(
-                f"Transform list fold did not get any inputs with wildcard!"
+                "Transform list fold did not get any inputs with wildcard!"
             )
 
     def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:

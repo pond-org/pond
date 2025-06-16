@@ -1,39 +1,37 @@
+import datetime
+import hashlib
+import inspect
 import os
+import random
+import traceback
+from datetime import timezone
 
 # from types import ModuleType
-from typing import Union, Optional, Type
-import datetime
-from datetime import timezone
-import random
-import inspect
-import traceback
-
-import hashlib
-from loguru import logger
-from pydantic import BaseModel
+from typing import Optional, Type, Union
 
 from hamilton_sdk.api.clients import (
     BasicSynchronousHamiltonClient,
-    UnauthorizedException,
     ResourceDoesNotExistException,
+    UnauthorizedException,
 )
 from hamilton_sdk.api.projecttypes import GitInfo
-from hamilton_sdk.tracking.runs import Status, TrackingState
-from hamilton_sdk.tracking.trackingtypes import TaskRun
-from hamilton_sdk.tracking.data_observation import ObservationType
-
 from hamilton_sdk.driver import (
-    validate_tags,
-    _get_fully_qualified_function_path,
     _derive_url,
     _derive_version_control_info,
+    _get_fully_qualified_function_path,
+    validate_tags,
 )
+from hamilton_sdk.tracking.data_observation import ObservationType
+from hamilton_sdk.tracking.runs import Status, TrackingState
+from hamilton_sdk.tracking.trackingtypes import TaskRun
+from loguru import logger
+from pydantic import BaseModel
 
-from pond.lens import LensPath, LensInfo, get_cleaned_path
-from pond.transforms.abstract_transform import AbstractExecuteTransform
-from pond.transforms.transform_pipe import TransformPipe
-from pond.transforms.transform_index import TransformIndex
 from pond.hooks.abstract_hook import AbstractHook
+from pond.lens import LensInfo, LensPath, get_cleaned_path
+from pond.transforms.abstract_transform import AbstractExecuteTransform
+from pond.transforms.transform_index import TransformIndex
+from pond.transforms.transform_pipe import TransformPipe
 
 LONG_SCALE = float(0xFFFFFFFFFFFFFFF)
 
@@ -636,7 +634,7 @@ class UIHook(AbstractHook):
             other_attr = dict(
                 node_name=get_node_name(name, task_id),
                 name=other_result.get(
-                    "name", f"Attribute {i+1}"
+                    "name", f"Attribute {i + 1}"
                 ),  # retrieve name if specified
                 type=other_result["observability_type"],
                 # 0.0.3 -> 3

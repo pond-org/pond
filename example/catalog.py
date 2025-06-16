@@ -1,10 +1,10 @@
-from pydantic import BaseModel
-import numpy as np
 import laspy
+import numpy as np
 import plotly.graph_objects as go
+from pydantic import BaseModel
 
-from pond import File, Field
-from pond.io.readers import read_npz, read_las
+from pond import Field, File
+from pond.io.readers import read_las, read_npz
 from pond.io.writers import write_npz, write_plotly_png
 
 

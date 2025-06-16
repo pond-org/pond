@@ -1,14 +1,7 @@
 import pytest
 
-from pond import State, pipe, node
 from conf.catalog import Catalog, Navigation
-
-from tests.test_utils import (
-    catalog,
-    empty_iceberg_catalog,
-    empty_lance_catalog,
-    empty_delta_catalog,
-)
+from pond import State, node, pipe
 
 
 @pytest.mark.parametrize(

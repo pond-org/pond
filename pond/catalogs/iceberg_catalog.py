@@ -1,7 +1,7 @@
 from typing import Optional
 
-from pyiceberg.catalog import load_catalog
 import pyarrow as pa
+from pyiceberg.catalog import load_catalog
 
 from pond.catalogs.abstract_catalog import AbstractCatalog, LensPath
 

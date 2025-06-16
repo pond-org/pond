@@ -2,17 +2,8 @@
 
 import pytest
 
-from pond import State
-from tests.test_utils import (
-    catalog,
-    filled_iceberg_catalog,
-    filled_lance_catalog,
-    empty_iceberg_catalog,
-    empty_lance_catalog,
-    empty_delta_catalog,
-)
-
 from conf.catalog import Catalog
+from pond import State
 
 
 @pytest.mark.parametrize(

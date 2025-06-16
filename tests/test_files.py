@@ -3,14 +3,8 @@ from PIL import Image
 
 from conf.catalog import Navigation, Values
 from conf.file_catalog import FileCatalog, FileDrive
-
-from pond.field import File
 from pond import Lens
-from tests.test_utils import (
-    empty_iceberg_catalog,
-    empty_lance_catalog,
-    empty_delta_catalog,
-)
+from pond.field import File
 
 
 @pytest.fixture
@@ -57,12 +51,12 @@ def test_set_file_entry(request, catalog, tmp_path_factory, data_catalog_fixture
     assert value.path == "catalog/image"
     src = catalog.image.get()
     target = value.get()
-    assert (
-        target.mode == src.mode
-    ), f"got mode {repr(target.mode)}, expected {repr(src.mode)}"
-    assert (
-        target.size == src.size
-    ), f"got size {repr(target.size)}, expected {repr(src.size)}"
+    assert target.mode == src.mode, (
+        f"got mode {repr(target.mode)}, expected {repr(src.mode)}"
+    )
+    assert target.size == src.size, (
+        f"got size {repr(target.size)}, expected {repr(src.size)}"
+    )
     assert target.tobytes() == src.tobytes()
     storage_path = tmp_path_factory.mktemp("storage2")
     lens = Lens(FileCatalog, "values", data_catalog, root_path, volume_protocol_args)
@@ -106,12 +100,12 @@ def test_get_file_part(request, catalog, tmp_path_factory, data_catalog_fixture)
     assert value.path == "catalog/image"
     src = catalog.image.get()
     target = value.get()
-    assert (
-        target.mode == src.mode
-    ), f"got mode {repr(target.mode)}, expected {repr(src.mode)}"
-    assert (
-        target.size == src.size
-    ), f"got size {repr(target.size)}, expected {repr(src.size)}"
+    assert target.mode == src.mode, (
+        f"got mode {repr(target.mode)}, expected {repr(src.mode)}"
+    )
+    assert target.size == src.size, (
+        f"got size {repr(target.size)}, expected {repr(src.size)}"
+    )
     assert target.tobytes() == src.tobytes()
 
     lens = Lens(FileCatalog, "values", data_catalog, root_path, volume_protocol_args)
