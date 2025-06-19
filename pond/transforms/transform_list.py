@@ -92,13 +92,13 @@ class TransformList(Transform):
         execute_units = []
         for index in range(0, length):
             inputs = []
-            for i, path_index in zip(self.input_lenses.values(), self.input_inds):
+            for il, path_index in zip(self.input_lenses.values(), self.input_inds):
                 if path_index != -1:
-                    i.set_index(path_index, index)
-                    inputs.append(i.lens_path.clone())
-                    i.set_index(path_index, -1)
+                    il.set_index(path_index, index)
+                    inputs.append(il.lens_path.clone())
+                    il.set_index(path_index, -1)
                 else:
-                    inputs.append(i.lens_path)
+                    inputs.append(il.lens_path)
             # NOTE: setting output indices is actually not strictly necessary
             outputs = []
             append_outputs = []
@@ -119,7 +119,8 @@ class TransformList(Transform):
                     append_outputs=append_outputs,
                 )
             )
-        return execute_units
+        # NOTE: mypy should really accept this?
+        return execute_units  # type: ignore
 
     def needs_commit_lock(self) -> bool:
         # TODO: this should depend on if output is writing to the

@@ -1,7 +1,7 @@
 import os
 
-import lance
-import pyarrow as pa
+import lance  # type: ignore
+import pyarrow as pa  # type: ignore
 
 from pond.catalogs.abstract_catalog import AbstractCatalog, LensPath
 
@@ -19,7 +19,7 @@ class LanceCatalog(AbstractCatalog):
     # TODO: make this more efficient
     def len(self, path: LensPath) -> int:
         table, _ = self.load_table(path)
-        return table.num_rows
+        return 0 if table is None else table.num_rows
 
     def write_table(
         self,
@@ -83,4 +83,4 @@ class LanceCatalog(AbstractCatalog):
             # return type.parse_obj(table.to_pylist()[0]["value"])
         else:
             table = ds.to_table(offset=offset, limit=limit)
-        return table, query
+        return table, bool(query)

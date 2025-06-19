@@ -13,17 +13,17 @@ class File(BaseModel, Generic[DataT]):
 
     @staticmethod
     def save(path: str, loader: Callable[[], DataT]) -> "File[DataT]":
-        return File(path=path, loader=loader)
+        return File(path=path, loader=loader)  # type: ignore
 
     @staticmethod
     def set(object: DataT) -> "File[DataT]":
-        return File(path="", object=object)
+        return File(path="", object=object)  # type: ignore
 
     def get(self) -> DataT:
-        return self.object
+        return self.object  # type: ignore
 
     def load(self) -> DataT:
-        return self.loader()
+        return self.loader()  # type: ignore
 
 
 def Field(

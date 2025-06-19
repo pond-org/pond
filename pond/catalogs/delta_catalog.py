@@ -2,8 +2,8 @@ import os
 from pathlib import Path
 from typing import Optional, Union
 
-import pyarrow as pa
-import pyarrow.compute as pc
+import pyarrow as pa  # type: ignore
+import pyarrow.compute as pc  # type: ignore
 from deltalake import DeltaTable, write_deltalake
 
 from pond.catalogs.abstract_catalog import AbstractCatalog, LensPath
@@ -27,7 +27,7 @@ class DeltaCatalog(AbstractCatalog):
     # TODO: make this more efficient
     def len(self, path: LensPath) -> int:
         table, _ = self.load_table(path)
-        return table.num_rows
+        return 0 if table is None else table.num_rows
 
     def write_table(
         self,
@@ -59,7 +59,7 @@ class DeltaCatalog(AbstractCatalog):
                 table,
                 schema=schema,
                 mode=mode,
-            )
+            )  # type: ignore
         return True
 
     def exists_at_level(self, path: LensPath) -> bool:
@@ -98,7 +98,7 @@ class DeltaCatalog(AbstractCatalog):
         if not found:
             return None, False
         # ds = lance.dataset(fs_path)
-        delta_table = DeltaTable(fs_path, self.storage_options)
+        delta_table = DeltaTable(fs_path, self.storage_options)  # type: ignore[arg-type]
         indices = [offset] if offset is not None else [0]
         if query:
             if offset is not None:
@@ -106,7 +106,7 @@ class DeltaCatalog(AbstractCatalog):
                     indices=indices, columns={"value": pc.field(query)}
                 )
             else:
-                table = delta_table.to_pyarrow_table(columns={"value": pc.field(query)})
+                table = delta_table.to_pyarrow_table(columns={"value": pc.field(query)})  # type: ignore[arg-type]
         elif offset is not None:
             # table = delta_table.to_pyarrow_table(filters=[("index", "=", str(offset))])
             table = delta_table.to_pyarrow_dataset().take(
@@ -114,4 +114,4 @@ class DeltaCatalog(AbstractCatalog):
             )
         else:
             table = delta_table.to_pyarrow_table()
-        return table, query
+        return table, bool(query)

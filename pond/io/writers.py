@@ -1,9 +1,9 @@
 import pickle
 from typing import Any
 
-import laspy
+import laspy  # type: ignore
 import numpy as np
-import plotly.graph_objects as go
+import plotly.graph_objects as go  # type: ignore
 from PIL import Image
 
 

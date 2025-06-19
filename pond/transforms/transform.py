@@ -1,6 +1,6 @@
 import warnings
 from collections import OrderedDict
-from typing import Callable, Self, Tuple, Type, get_args, get_type_hints
+from typing import Callable, Tuple, Type, get_args, get_type_hints
 
 from beartype.door import is_subhint
 from beartype.roar import BeartypeDoorNonpepException
@@ -64,7 +64,7 @@ class Transform(AbstractExecuteTransform):
             try:
                 input_lens_type = input_lens.get_type()
                 if is_list_fold and wildcard_index != -1:
-                    input_lens_type = list[input_lens_type]
+                    input_lens_type = list[input_lens_type]  # type: ignore
                 type_checks = is_subhint(input_lens_type, input_type)
                 assert type_checks, (
                     f"Input {input_name} of type {input_type} does not agree with catalog entry {input_field_name} with type {input_lens.get_type()}"
@@ -87,7 +87,7 @@ class Transform(AbstractExecuteTransform):
         return self.fn.__name__
 
     def get_docs(self) -> str:
-        return self.fn.__doc__
+        return self.fn.__doc__ if self.fn.__doc__ is not None else ""
 
     def get_fn(self) -> Callable:
         return self.fn
@@ -98,7 +98,7 @@ class Transform(AbstractExecuteTransform):
     def get_outputs(self) -> list[LensPath]:
         return [o.lens_path for o in self.output_lenses.values()]
 
-    def get_transforms(self) -> list[Self]:
+    def get_transforms(self) -> list[AbstractExecuteTransform]:
         return [self]
 
     def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:

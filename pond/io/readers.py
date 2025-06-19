@@ -1,7 +1,7 @@
 import pickle
 from typing import Any
 
-import laspy
+import laspy  # type: ignore
 import numpy as np
 from PIL import Image
 

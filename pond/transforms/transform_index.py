@@ -1,4 +1,4 @@
-from typing import Any, Callable, Self, Type, get_args, get_origin
+from typing import Any, Callable, Type, get_args, get_origin
 
 from pydantic import BaseModel
 from pydantic._internal import _generics
@@ -31,6 +31,7 @@ def get_file_paths(path: list[TypeField], model_type: Type) -> list[LensPath]:
         file_paths = []
         for field in model_type.model_fields:
             field_type = model_type.model_fields[field].annotation
+            assert field_type is not None
             field_path = path + [TypeField(field, None)]
             file_paths.extend(get_file_paths(field_path, field_type))
         return file_paths
@@ -88,7 +89,7 @@ class TransformIndex(AbstractExecuteTransform):
     def get_outputs(self) -> list[LensPath]:
         return self.outputs
 
-    def get_transforms(self) -> list[Self]:
+    def get_transforms(self) -> list[AbstractExecuteTransform]:
         return [self]
 
     def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:

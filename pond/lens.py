@@ -1,10 +1,10 @@
 import datetime
 from typing import Any, List, Type, get_args, get_origin
 
-import fsspec
-import pyarrow as pa
-import pydantic_to_pyarrow
-from parse import parse
+import fsspec  # type: ignore
+import pyarrow as pa  # type: ignore
+import pydantic_to_pyarrow  # type: ignore
+from parse import parse  # type: ignore
 from pydantic import BaseModel, NaiveDatetime
 from pydantic._internal import _generics
 
@@ -28,7 +28,7 @@ def get_pyarrow_schema(t: Type) -> pa.Schema:
         by_alias=False,
         exclude_fields=True,
     )
-    metadata = {}
+    metadata: list[Any] = []
     # return pydantic_to_pyarrow.schema._get_pyarrow_type()
     if get_origin(t) is list:
         t = get_args(t)[0]
@@ -50,14 +50,18 @@ def get_tree_type(
     if not path:
         return root_type, {}
     field = path.pop(0)
-    field_type = root_type.model_fields[field.name].annotation
-    extra_args = root_type.model_fields[field.name].json_schema_extra
+    field_type: Type
+    field_type = root_type.model_fields[field.name].annotation  # type: ignore
+    extra_args: dict
+    extra_args = root_type.model_fields[field.name].json_schema_extra  # type: ignore
     if field.index is not None:
         assert get_origin(field_type) is list
         field_type = get_args(field_type)[0]
-    type, extra_args = (
-        get_tree_type(path, field_type) if path else (field_type, extra_args)
-    )
+    if path:
+        assert issubclass(field_type, BaseModel)
+        type, extra_args = get_tree_type(path, field_type)
+    else:
+        type = field_type
     path.insert(0, field)
     return type, extra_args
 
@@ -116,7 +120,7 @@ class LensInfo:
             if get_origin(self.type) is list:
                 item_type = get_args(self.type)[0]
                 assert issubclass(item_type, File)
-                return list[_generics.get_args(item_type)[0]]
+                return list[_generics.get_args(item_type)[0]]  # type: ignore
             else:
                 assert issubclass(self.type, File)
                 return _generics.get_args(self.type)[0]
@@ -183,7 +187,7 @@ class Lens(LensInfo):
             fs_path = f"{file_path}.{ext}"
             if not fs.exists(fs_path):
                 return
-            value = File(path=file_path)
+            value: File[Any] = File(path=file_path)
             schema = get_pyarrow_schema(model_type)
             table = pa.Table.from_pylist([value.model_dump()], schema=schema)
             # writer(model.get(), self.fs, f"{self.storage_path}/{path}")
@@ -249,8 +253,9 @@ class Lens(LensInfo):
                     counter += 1
         elif issubclass(model_type, BaseModel):
             for field in model_type.model_fields:
-                extra_args = model_type.model_fields[field].json_schema_extra
+                extra_args = model_type.model_fields[field].json_schema_extra  # type: ignore
                 field_type = model_type.model_fields[field].annotation
+                assert field_type is not None
                 field_path = path + [TypeField(field, None)]
                 if extra_args and extra_args.get("path", None):
                     field_file_path = extra_args["path"]
@@ -266,13 +271,13 @@ class Lens(LensInfo):
             ext = extra_args["ext"]
             protocol = extra_args["protocol"] or self.default_volume_protocol
             fs = fsspec.filesystem(**self.volume_protocol_args[protocol])
-            model.object = reader(fs, f"{model.path}.{ext}")
+            model.object = reader(fs, f"{model.path}.{ext}")  # type: ignore[attr-defined]
         elif isinstance(model, list):
             for i, value in enumerate(model):
                 self.get_file_paths(value, extra_args)
         elif isinstance(model, BaseModel):
             for field, value in model:
-                extra_args = model.model_fields[field].json_schema_extra
+                extra_args = model.model_fields[field].json_schema_extra  # type: ignore[assignment]
                 self.get_file_paths(value, extra_args)
 
     def get(self) -> None | list[BaseModel] | BaseModel:
@@ -343,12 +348,14 @@ class Lens(LensInfo):
 
         if self.lens_path.variant == "file":
             if _generics.get_origin(self.type) == File:
+                assert isinstance(rtn, File)
                 return rtn.get()
             elif (
                 get_origin(self.type) is list
                 and _generics.get_origin(get_args(self.type)[0]) == File
             ):
-                return [r.get() for r in rtn]
+                assert isinstance(rtn, list)
+                return [r.get() for r in rtn if isinstance(r, File)]
             else:
                 raise RuntimeError("pond requires file variant to have type File")
 
@@ -374,7 +381,7 @@ class Lens(LensInfo):
         elif isinstance(model, BaseModel):
             found = False
             for field, value in model:
-                extra_args = model.model_fields[field].json_schema_extra
+                extra_args = model.model_fields[field].json_schema_extra  # type: ignore[assignment]
                 found = (
                     self.set_file_paths(f"{path}/{field}", value, extra_args) or found
                 )
@@ -394,7 +401,8 @@ class Lens(LensInfo):
                 get_origin(self.type) is list
                 and _generics.get_origin(get_args(self.type)[0]) == File
             ):
-                value = [File.set(v) for v in value]
+                assert isinstance(value, list)
+                value = [File.set(v) for v in value]  # type: ignore[assignment]
             else:
                 raise RuntimeError("pond requires file variant to have type File")
         elif self.lens_path.variant == "table":
@@ -408,12 +416,15 @@ class Lens(LensInfo):
 
         # TODO: this should be a recursive function instead
         if get_origin(self.type) is list:
+            assert isinstance(value, list)
             field_type = get_args(field_type)[0]
             if len(value) == 0:
                 # raise RuntimeError("pond can not yet write empty lists")
                 value_to_write = []
             elif isinstance(value[0], BaseModel):
-                value_to_write = [v.model_dump() for v in value]
+                value_to_write = [
+                    v.model_dump() for v in value if isinstance(v, BaseModel)
+                ]
                 # per_row = True
             # elif field_type in pydantic_to_pyarrow.schema.FIELD_MAP:
             elif field_type in FIELD_MAP:

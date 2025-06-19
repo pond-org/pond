@@ -28,3 +28,9 @@ src = ["pond", "tests", "conf"]
 line-length = 88
 target-version = "py310"
 extend-exclude = ["docs/*"]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.16.1",
+    "types-pyyaml>=6.0.12.20250516",
+]

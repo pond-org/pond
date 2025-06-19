@@ -1,6 +1,6 @@
 from typing import Optional
 
-import pyarrow as pa
+import pyarrow as pa  # type: ignore
 from pyiceberg.catalog import load_catalog
 
 from pond.catalogs.abstract_catalog import AbstractCatalog, LensPath
@@ -22,7 +22,7 @@ class IcebergCatalog(AbstractCatalog):
     # TODO: make this more efficient
     def len(self, path: LensPath) -> int:
         table, _ = self.load_table(path)
-        return table.num_rows
+        return 0 if table is None else table.num_rows
 
     def write_table(
         self,

@@ -1,35 +1,38 @@
-from abc import ABC
-from typing import Any, Callable, NewType, Type
+from abc import ABC, abstractmethod
+from typing import Any, Callable, Type
 
-import dill
+import dill  # type: ignore
 from pydantic import BaseModel
 
 from pond.lens import LensInfo, LensPath
 from pond.state import State
 
-AbstractExecuteTransform = NewType("AbstractExecuteTransform", None)
+# AbstractExecuteTransform = NewType("AbstractExecuteTransform", None)
 
 
 class AbstractTransform(ABC):
-    def get_input_types(self, root_type: Type[BaseModel]) -> dict[str, Type]:
+    def get_input_types(self, root_type: Type[BaseModel]) -> list[Type]:
         return [LensInfo(root_type, p).get_type() for p in self.get_inputs()]
 
-    def get_output_type(self, root_type: Type[BaseModel]) -> Type:
+    def get_output_type(self, root_type: Type[BaseModel]) -> Type | None:
         outputs = [LensInfo(root_type, p).get_type() for p in self.get_outputs()]
         if len(outputs) == 0:
             return None
         elif len(outputs) == 1:
             return outputs[0]
         else:
-            return tuple[*outputs]
+            return tuple[*outputs]  # type: ignore
 
+    @abstractmethod
     def get_inputs(self) -> list[LensPath]:
         pass
 
+    @abstractmethod
     def get_outputs(self) -> list[LensPath]:
         pass
 
-    def get_transforms(self) -> list[AbstractExecuteTransform]:
+    @abstractmethod
+    def get_transforms(self) -> list["AbstractExecuteTransform"]:
         pass
 
 
@@ -44,15 +47,19 @@ class AbstractExecuteUnit(ABC):
     def get_outputs(self) -> list[LensPath]:
         return self.outputs
 
+    @abstractmethod
     def load_inputs(self, state: State) -> list[Any]:
         pass
 
+    @abstractmethod
     def save_outputs(self, state: State, outputs: list[Any]) -> list[Any]:
         pass
 
+    @abstractmethod
     def commit(self, state: State, values: list[Any]) -> bool:
         pass
 
+    @abstractmethod
     def run(self, args: list[Any]) -> list[Any]:
         pass
 
@@ -131,15 +138,19 @@ class ExecuteTransform(AbstractExecuteUnit):
 
 
 class AbstractExecuteTransform(AbstractTransform):
+    @abstractmethod
     def get_name(self) -> str:
         pass
 
+    @abstractmethod
     def get_docs(self) -> str:
         pass
 
+    @abstractmethod
     def get_fn(self) -> Callable:
         pass
 
+    @abstractmethod
     def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:
         pass
 

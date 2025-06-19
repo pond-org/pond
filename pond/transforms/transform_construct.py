@@ -1,4 +1,4 @@
-from typing import Any, Callable, Self, Type, get_origin
+from typing import Any, Callable, Type, get_origin
 
 from pydantic import BaseModel
 
@@ -65,7 +65,7 @@ class TransformConstruct(AbstractExecuteTransform):
     def get_outputs(self) -> list[LensPath]:
         return self.outputs
 
-    def get_transforms(self) -> list[Self]:
+    def get_transforms(self) -> list[AbstractExecuteTransform]:
         return [self]
 
     def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:

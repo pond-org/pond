@@ -1,11 +1,10 @@
 import copy
-import os
-from abc import ABC
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Self
 
-import pyarrow as pa
-from parse import parse
+import pyarrow as pa  # type: ignore
+from parse import parse  # type: ignore
 
 
 @dataclass
@@ -13,12 +12,12 @@ class TypeField:
     name: str
     index: int | None
 
-    def __eq__(self, other: Self) -> bool:
+    def __eq__(self, other: Self) -> bool:  # type: ignore
         self_index = self.index if self.index != -1 else None
         other_index = other.index if other.index != -1 else None
         return self.name == other.name and self_index == other_index
 
-    def subset_of(self, other: Self):
+    def subset_of(self, other: Self) -> bool:
         self_index = self.index if self.index != -1 else None
         other_index = other.index if other.index != -1 else None
         return self.name == other.name and (
@@ -71,7 +70,7 @@ class LensPath:
     def clone(self) -> Self:
         return copy.deepcopy(self)
 
-    def __eq__(self, other: Self) -> bool:
+    def __eq__(self, other: Self) -> bool:  # type: ignore
         equal = self.path == other.path
         return equal
 
@@ -94,7 +93,7 @@ class LensPath:
                 parts.append(f"[{field.index + 1}]")
         return "".join(parts)
 
-    def to_fspath(self, level: int = 1, last_index: bool = True) -> os.PathLike:
+    def to_fspath(self, level: int = 1, last_index: bool = True) -> str:
         assert level >= 1 and level <= len(self.path)
         entries = list(
             map(
@@ -106,7 +105,7 @@ class LensPath:
             entries[-1] = self.path[level - 1].name
         return "/".join(entries)
 
-    def to_volume_path(self) -> os.PathLike:
+    def to_volume_path(self) -> str:
         entries = map(
             lambda p: p.name if p.index is None else f"{p.name}/{p.index}",
             self.path,
@@ -115,30 +114,35 @@ class LensPath:
 
     def path_and_query(
         self, level: int = 1, last_index: bool = True, dot_accessor: bool = False
-    ) -> tuple[os.PathLike, str]:
+    ) -> tuple[str, str]:
         return self.to_fspath(level, last_index), self.get_db_query(level, dot_accessor)
 
 
 class AbstractCatalog(ABC):
+    @abstractmethod
     def len(self, path: LensPath) -> int:
         pass
 
+    @abstractmethod
     def __getstate__(self):
         pass
 
+    @abstractmethod
     def __setstate__(self, state):
         pass
 
+    @abstractmethod
     def write_table(
         self,
         table: pa.Table,
         path: LensPath,
         schema: pa.Schema,
-        per_row: bool,
-        append: bool,
+        per_row: bool = False,
+        append: bool = False,
     ) -> bool:
         pass
 
+    @abstractmethod
     def exists_at_level(self, path: LensPath) -> bool:
         pass
 
@@ -154,5 +158,6 @@ class AbstractCatalog(ABC):
                 return True
         return self.exists(LensPath(path.path[:-1]))
 
-    def load_table(self, path: LensPath) -> pa.Table | None:
+    @abstractmethod
+    def load_table(self, path: LensPath) -> tuple[pa.Table | None, bool]:
         pass

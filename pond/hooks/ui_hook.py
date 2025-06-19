@@ -9,21 +9,21 @@ from datetime import timezone
 # from types import ModuleType
 from typing import Optional, Type, Union
 
-from hamilton_sdk.api.clients import (
+from hamilton_sdk.api.clients import (  # type: ignore
     BasicSynchronousHamiltonClient,
     ResourceDoesNotExistException,
     UnauthorizedException,
 )
-from hamilton_sdk.api.projecttypes import GitInfo
-from hamilton_sdk.driver import (
+from hamilton_sdk.api.projecttypes import GitInfo  # type: ignore
+from hamilton_sdk.driver import (  # type: ignore
     _derive_url,
     _derive_version_control_info,
     _get_fully_qualified_function_path,
     validate_tags,
 )
-from hamilton_sdk.tracking.data_observation import ObservationType
-from hamilton_sdk.tracking.runs import Status, TrackingState
-from hamilton_sdk.tracking.trackingtypes import TaskRun
+from hamilton_sdk.tracking.data_observation import ObservationType  # type: ignore
+from hamilton_sdk.tracking.runs import Status, TrackingState  # type: ignore
+from hamilton_sdk.tracking.trackingtypes import TaskRun  # type: ignore
 from loguru import logger
 from pydantic import BaseModel
 
@@ -258,7 +258,8 @@ def _slurp_code(
     modules = set()
     for transform in transforms:
         module = inspect.getmodule(transform.get_fn())
-        modules.add(module)
+        if module is not None:
+            modules.add(module)
     out = []
     for module in modules:
         if hasattr(module, "__file__") and module.__file__ is not None:
@@ -303,7 +304,7 @@ def process_result(
     transform: AbstractExecuteTransform,
 ) -> tuple[Optional[ObservationType], Optional[ObservationType], list[ObservationType]]:
     schema = None
-    additional = []
+    additional: list[ObservationType] = []
     statistics = {
         "observability_type": "primitive",
         "observability_value": {
@@ -322,8 +323,8 @@ class UIHook(AbstractHook):
         username: str,
         dag_name: str,
         # root_type: Type[BaseModel],
-        tags: dict[str, str] = None,
-        api_key: str = None,
+        tags: dict[str, str] = {},
+        api_key: Optional[str] = None,
         hamilton_api_url="http://localhost:8241",
         hamilton_ui_url="http://localhost:8241",
         verify: Union[str, bool] = True,
@@ -351,7 +352,7 @@ class UIHook(AbstractHook):
         )
         self.initialized = False
         self.project_version = None
-        self.base_tags = tags if tags is not None else {}
+        self.base_tags = tags
         validate_tags(self.base_tags)
         self.dag_name = dag_name
         self.hamilton_ui_url = hamilton_ui_url
@@ -372,10 +373,10 @@ class UIHook(AbstractHook):
                 f"You can do so at {self.hamilton_ui_url}/dashboard/projects"
             )
             raise
-        self.dag_template_id_cache = {}
-        self.tracking_states = {}
-        self.dw_run_ids = {}
-        self.task_runs = {}
+        self.dag_template_id_cache: dict[int, str] = {}
+        self.tracking_states: dict[str, TrackingState] = {}
+        self.dw_run_ids: dict[str, str] = {}
+        self.task_runs: dict[str, TaskRun] = {}
         self.dependencies: dict[str, set[str]] = {}
         super().__init__()
         # set this to a float to sample blocks. 0.1 means 10% of blocks will be sampled.
@@ -383,7 +384,7 @@ class UIHook(AbstractHook):
         self.special_parallel_sample_strategy = None
         # set this to some constant value if you want to generate the same sample each time.
         # if you're using a float value.
-        self.seed = None
+        self.seed: float | None = None
 
     def stop(self):
         """Initiates stop if run in remote environment"""
@@ -515,15 +516,15 @@ class UIHook(AbstractHook):
         """Creates a deterministic hash."""
         full_salt = "%s.%s%s" % (self.seed, "POND", ".")
         hash_str = "%s%s" % (full_salt, str(block_value))
-        hash_str = hash_str.encode("ascii")
-        return int(hashlib.sha1(hash_str).hexdigest()[:15], 16)
+        hash_str_b = hash_str.encode("ascii")
+        return int(hashlib.sha1(hash_str_b).hexdigest()[:15], 16)
 
     def get_deterministic_random(self, block_value: int):
         """Gets a random number between 0 & 1 given the block value."""
         zero_to_one = self.get_hash(block_value) / LONG_SCALE
         return zero_to_one  # should be between 0 and 1
 
-    def is_in_sample(self, task_id: str) -> bool:
+    def is_in_sample(self, task_id: Optional[str]) -> bool:
         """Determines if what we're tracking is considered in sample.
 
         This should only be used at the node level right now and is intended
@@ -609,6 +610,7 @@ class UIHook(AbstractHook):
             )
 
         else:
+            assert error is not None
             task_run.status = Status.FAILURE
             task_run.is_in_sample = True  # override any sampling
             # if isinstance(error, dq_base.DataValidationError):
