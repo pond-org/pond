@@ -1,4 +1,7 @@
+import os
 import argparse
+
+os.environ["PYICEBERG_HOME"] = str(os.getcwd())  # noqa: E402
 
 from example.catalog import Catalog
 from example.pipeline import heightmap_pipe
