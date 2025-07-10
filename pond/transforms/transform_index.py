@@ -64,11 +64,12 @@ class TransformIndex(AbstractExecuteTransform):
         self,
         Catalog: Type[BaseModel],
         path: list[str] | str = "",
+        root_path: str = "catalog",
     ):
         paths = path if isinstance(path, list) else [path]
         self.outputs = []
         for p in paths:
-            lens_info = LensInfo.from_path(Catalog, p)
+            lens_info = LensInfo.from_path(Catalog, p, root_path)
             file_paths = get_file_paths(lens_info.lens_path.path, lens_info.type)
             self.outputs.extend(file_paths)
 

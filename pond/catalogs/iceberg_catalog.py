@@ -33,9 +33,11 @@ class IcebergCatalog(AbstractCatalog):
         append: bool = False,
     ) -> bool:
         # names = [p.name for p in path.path]
-        names = ["catalog"] + [
+        names = [
             p.name if p.index is None else f"{p.name}[{p.index}]" for p in path.path
         ]
+        if len(names) == 1:
+            names.insert(0, "root")
         namespace = ".".join(names[:-1])
         self.catalog.create_namespace_if_not_exists(namespace)
         iceberg_table = self.catalog.create_table_if_not_exists(
@@ -54,32 +56,40 @@ class IcebergCatalog(AbstractCatalog):
         return True
 
     def exists_at_level(self, path: LensPath) -> bool:
-        names = ["catalog"] + [
+        names = [
             p.name if p.index is None else f"{p.name}[{p.index}]" for p in path.path
         ]
+        if len(names) == 1:
+            names.insert(0, "root")
         identifier = ".".join(names)
         return self.catalog.table_exists(identifier)
 
     def load_table(self, path: LensPath) -> tuple[pa.Table | None, bool]:
         # names = ["catalog"] + [p.name for p in path.path]
-        names = ["catalog"] + [
+        names = [
             p.name if p.index is None else f"{p.name}[{p.index}]" for p in path.path
         ]
         index = None
         found = False
-        for level in reversed(range(1, len(path.path) + 1)):
+        for level in reversed(range(0, len(path.path))):
             # namespace = ".".join(names[: level - 1])
-            identifier = ".".join(names[: level + 1])
-            query = path.path[level:]  # if level > 1 else []
+            levels = names[: level + 1]
+            if len(levels) == 1:
+                levels.insert(0, "root")
+            identifier = ".".join(levels)
+            query = path.path[level + 1 :]  # if level > 1 else []
             if self.catalog.table_exists(identifier):
                 found = True
                 break
-            index = path.path[level - 1].index
+            index = path.path[level].index
             if index is None:
                 continue
 
             # we want to see if x.example as well as x.example[0]
-            identifier = ".".join(names[:level] + [path.path[level - 1].name])
+            levels = names[:level] + [path.path[level].name]
+            if len(levels) == 1:
+                levels.insert(0, "root")
+            identifier = ".".join(levels)
             if self.catalog.table_exists(identifier):
                 found = True
                 break
