@@ -38,14 +38,14 @@ class IcebergCatalog(AbstractCatalog):
         ]
         if len(names) == 1:
             names.insert(0, "root")
-        namespace = ".".join(names[:-1])
+        namespace = "/".join(names[:-1])
         self.catalog.create_namespace_if_not_exists(namespace)
         iceberg_table = self.catalog.create_table_if_not_exists(
-            identifier=".".join(names),
+            identifier=namespace + "." + names[-1],
             schema=schema,
         )
         if append:
-            # iceberg_table = self.catalog.load_table(".".join(names))
+            # iceberg_table = self.catalog.load_table("/".join(names))
             iceberg_table.append(table)
         elif per_row:
             iceberg_table.overwrite(df=table.take([table.num_rows - 1]))
@@ -61,7 +61,7 @@ class IcebergCatalog(AbstractCatalog):
         ]
         if len(names) == 1:
             names.insert(0, "root")
-        identifier = ".".join(names)
+        identifier = "/".join(names[:-1]) + "." + names[-1]
         return self.catalog.table_exists(identifier)
 
     def load_table(self, path: LensPath) -> tuple[pa.Table | None, bool]:
@@ -72,11 +72,11 @@ class IcebergCatalog(AbstractCatalog):
         index = None
         found = False
         for level in reversed(range(0, len(path.path))):
-            # namespace = ".".join(names[: level - 1])
+            # namespace = "/".join(names[: level - 1])
             levels = names[: level + 1]
             if len(levels) == 1:
                 levels.insert(0, "root")
-            identifier = ".".join(levels)
+            identifier = "/".join(levels[:-1]) + "." + levels[-1]
             query = path.path[level + 1 :]  # if level > 1 else []
             if self.catalog.table_exists(identifier):
                 found = True
@@ -89,7 +89,7 @@ class IcebergCatalog(AbstractCatalog):
             levels = names[:level] + [path.path[level].name]
             if len(levels) == 1:
                 levels.insert(0, "root")
-            identifier = ".".join(levels)
+            identifier = "/".join(levels[:-1]) + "." + levels[-1]
             if self.catalog.table_exists(identifier):
                 found = True
                 break
