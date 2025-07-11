@@ -1,7 +1,7 @@
 import os
 import argparse
 
-os.environ["PYICEBERG_HOME"] = str(os.getcwd())  # noqa: E402
+os.environ["PYICEBERG_HOME"] = os.getcwd()  # noqa: E402
 
 from example.catalog import Catalog
 from example.pipeline import heightmap_pipe
@@ -42,7 +42,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--catalog", help="Catalog type: iceberg or hamilton", default="iceberg"
+        "--catalog", help="Catalog type: iceberg or lance", default="iceberg"
     )
     parser.add_argument(
         "--runner", help="Runner type: sequential or parallel", default="parallel"
