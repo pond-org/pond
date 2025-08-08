@@ -89,9 +89,7 @@ def _(iceberg_catalog):
 
 @app.cell
 def _(plot_heightmap, state):
-    plot_heightmap.get_fn()(
-        state["params.res"], state["file:heightmap"], state["bounds"]
-    )
+    plot_heightmap.call(state)
     return
 
 

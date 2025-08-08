@@ -35,6 +35,21 @@ class AbstractTransform(ABC):
     def get_transforms(self) -> list["AbstractExecuteTransform"]:
         pass
 
+    def call(self, state: State) -> Any:
+        units = [
+            unit
+            for transform in self.get_transforms()
+            for unit in transform.get_execute_units(state)
+        ]
+        rtns = [unit.run(unit.load_inputs(state)) for unit in units]
+        # TODO: this is not entirely correct
+        # and should probably depend on if the
+        # transform is expanded or not
+        if len(rtns) == 1:
+            return rtns[0]
+        else:
+            return rtns
+
 
 class AbstractExecuteUnit(ABC):
     def __init__(self, inputs: list[LensPath], outputs: list[LensPath]):
