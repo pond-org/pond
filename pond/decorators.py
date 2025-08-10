@@ -70,5 +70,6 @@ def construct(
 def index_files(
     Catalog: Type[BaseModel],
     path: list[str] | str = "",
+    root_path: str = "catalog",
 ) -> TransformIndex:
-    return TransformIndex(Catalog, path)
+    return TransformIndex(Catalog, path, root_path)

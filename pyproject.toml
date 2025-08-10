@@ -12,6 +12,7 @@ dependencies = [
     "kaleido==0.2.1",
     "lancedb>=0.17.0",
     "laspy[lazrs]>=2.5.4",
+    "marimo[sql]>=0.14.10",
     "pandas>=2.2.3",
     "parse>=1.20.2",
     "pillow>=11.1.0",

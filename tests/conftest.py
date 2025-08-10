@@ -122,9 +122,9 @@ def write_iceberg_dataset(catalog, iceberg_catalog):
 
     data = pa.Table.from_pylist([catalog.model_dump()], schema=schema)
 
-    iceberg_catalog.create_namespace_if_not_exists("catalog")
+    iceberg_catalog.create_namespace_if_not_exists("root")
     iceberg_table = iceberg_catalog.create_table_if_not_exists(
-        identifier="catalog.test",
+        identifier="root.test",
         schema=schema,
     )
     iceberg_table.overwrite(df=data)
