@@ -10,6 +10,29 @@ from pond.transforms.transform import Transform
 # NOTE: this is actually a superset of the functionality
 # in transform, so we could use the same unit tests for that part
 class TransformListFold(Transform):
+    """Transform for aggregating arrays to scalar outputs (many-to-one mapping).
+
+    Extends Transform to handle array inputs with scalar outputs, aggregating
+    all array elements into a single result. This transform is automatically
+    selected by the @node decorator when input paths contain \"[:]\" but
+    output paths do not.
+
+    Example:
+        @node(Catalog, \"clouds[:].bounds\", \"global_bounds\")
+        def merge_bounds(bounds_list: list[Bounds]) -> Bounds:
+            return combine_all_bounds(bounds_list)
+        # Creates a TransformListFold instance
+
+    Processing Pattern:
+        - Input: clouds[0].bounds, clouds[1].bounds, ... → [bounds0, bounds1, ...]
+        - Function called once with entire list
+        - Output: Single value written to global_bounds
+
+    Note:
+        The function receives a list of all array elements as input.
+        Requires at least one wildcard in input paths, no wildcards in output paths.
+    """
+
     def __init__(
         self,
         Catalog: Type[BaseModel],
@@ -17,6 +40,21 @@ class TransformListFold(Transform):
         output: list[str] | str,
         fn: Callable,
     ):
+        """Initialize a TransformListFold with wildcard validation.
+
+        Args:
+            Catalog: Pydantic model class defining the data schema.
+            input: Input path(s) containing at least one \"[:]\" wildcard.
+            output: Output path(s) without wildcards (scalar outputs).
+            fn: Function that aggregates array elements to scalar result.
+
+        Raises:
+            ValueError: If no wildcards found in input paths.
+
+        Note:
+            The is_list_fold=True flag affects type validation in the parent class.
+            Function signature should accept list types matching the array element types.
+        """
         super().__init__(Catalog, input, output, fn, is_list_fold=True)
         wildcard = False
         for input_lens in self.input_lenses.values():
@@ -36,6 +74,19 @@ class TransformListFold(Transform):
             )
 
     def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:
+        """Create a single execute unit that aggregates all array elements.
+
+        Args:
+            state: Pipeline state (not used for list fold transforms).
+
+        Returns:
+            List containing a single ExecuteTransform unit that processes
+            all array elements and produces scalar output.
+
+        Note:
+            Unlike TransformList, this creates only one unit that handles
+            the entire array aggregation operation.
+        """
         # NOTE: setting output indices is actually not strictly necessary
         return [
             ExecuteTransform(

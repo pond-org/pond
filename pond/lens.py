@@ -23,6 +23,24 @@ EntryType = BaseModel | List[BaseModel] | BasicType | List[BasicType]
 
 
 def get_pyarrow_schema(t: Type) -> pa.Schema:
+    """Convert a Python type to a PyArrow schema.
+
+    Converts pydantic model types and basic Python types to equivalent
+    PyArrow schemas for catalog storage. Handles both single types and
+    list types appropriately.
+
+    Args:
+        t: The Python type to convert. Can be a pydantic BaseModel subclass,
+            basic type (str, int, float, bool), or list type.
+
+    Returns:
+        PyArrow schema representing the type structure.
+
+    Note:
+        For list types, extracts the element type and creates schema for that.
+        For non-BaseModel types, wraps in a 'value' field schema.
+        Uses pydantic-to-pyarrow for BaseModel conversion.
+    """
     settings = pydantic_to_pyarrow.schema.Settings(
         allow_losing_tz=False,
         by_alias=False,
@@ -47,6 +65,25 @@ def get_pyarrow_schema(t: Type) -> pa.Schema:
 def get_tree_type(
     path: list[TypeField], root_type: Type[BaseModel]
 ) -> tuple[Type[BaseModel], dict]:
+    """Navigate a type hierarchy to find the type at a specific path.
+
+    Traverses the pydantic model type hierarchy following the given path
+    to determine the final type and associated metadata.
+
+    Args:
+        path: List of TypeField components representing the navigation path.
+            Modified in-place during traversal.
+        root_type: The root pydantic model class to start navigation from.
+
+    Returns:
+        Tuple containing:
+        - The final type at the path location
+        - Dictionary of extra arguments/metadata from field definitions
+
+    Note:
+        Handles array indexing by unwrapping list types when index is specified.
+        Recursively processes nested model structures.
+    """
     if not path:
         return root_type, {}
     field = path.pop(0)
@@ -67,6 +104,22 @@ def get_tree_type(
 
 
 def get_cleaned_path(path: str, root_path: str) -> LensPath:
+    """Parse and clean a path string into a LensPath object.
+
+    Handles variant prefixes in path strings and creates appropriate
+    LensPath objects with the correct variant annotation.
+
+    Args:
+        path: Path string, optionally prefixed with variant like 'table:path.field'.
+        root_path: Root path name for the LensPath.
+
+    Returns:
+        LensPath object with the appropriate variant set.
+
+    Note:
+        Variant prefixes like 'table:', 'file:', etc. are extracted and
+        set as the LensPath variant. Default variant is 'default'.
+    """
     if matches := parse("{:l}:{}", path):
         variant, path = matches
     else:
@@ -75,6 +128,15 @@ def get_cleaned_path(path: str, root_path: str) -> LensPath:
     return lens_path
 
 
+"""Mapping of Python types to PyArrow types.
+
+Defines the conversion mapping for basic Python types to their
+equivalent PyArrow type representations for catalog storage.
+
+Note:
+    Used as fallback for types not handled by pydantic-to-pyarrow.
+    Covers common Python types and datetime variants.
+"""
 FIELD_MAP = {
     str: pa.string(),
     bytes: pa.binary(),
@@ -88,11 +150,33 @@ FIELD_MAP = {
 
 
 class LensInfo:
+    """Information about a lens path including type and metadata.
+
+    Encapsulates the path information and resolved type for a specific
+    location in the data catalog. Used by transforms for type validation
+    and by the lens system for data access.
+
+    Attributes:
+        lens_path: The LensPath specifying the data location.
+        type: The resolved Python type at the path location.
+        extra_args: Metadata dictionary from field definitions.
+
+    Note:
+        The type resolution considers variants and array indexing to
+        determine the actual data type that will be accessed.
+    """
+
     def __init__(
         self,
         root_type: Type[BaseModel],
         lens_path: LensPath,
     ):
+        """Initialize LensInfo by resolving path type information.
+
+        Args:
+            root_type: The root pydantic model class.
+            lens_path: The path to resolve type information for.
+        """
         self.lens_path = lens_path
         self.type, self.extra_args = get_tree_type(self.lens_path.path[1:], root_type)
 
@@ -132,6 +216,30 @@ class LensInfo:
 
 
 class Lens(LensInfo):
+    """Primary interface for accessing and manipulating data in pond catalogs.
+
+    The Lens provides a unified interface for reading and writing data at specific
+    paths in the catalog hierarchy. It handles both structured data (stored in
+    catalogs) and unstructured data (stored as files), with automatic conversion
+    between Python objects and catalog storage formats.
+
+    Key Features:
+    - Path-based data access with variant support (default, table, file)
+    - Automatic type conversion and validation
+    - File system integration via fsspec
+    - Lazy loading and efficient data access
+    - Support for both scalar and array data
+
+    Attributes:
+        catalog: The catalog backend for structured data storage.
+        volume_protocol_args: Configuration for filesystem protocols.
+        default_volume_protocol: Default protocol when none specified.
+
+    Note:
+        Lenses are typically created via State.lens() rather than directly.
+        The lens system is the primary way to interact with pond data.
+    """
+
     def __init__(
         self,
         root_type: Type[BaseModel],
@@ -141,6 +249,20 @@ class Lens(LensInfo):
         volume_protocol_args: dict[str, Any] = {},
         default_volume_protocol: str = "dir",
     ):
+        """Initialize a Lens for the specified path.
+
+        Args:
+            root_type: The root pydantic model class defining the schema.
+            path: Dot-separated path string specifying the data location.
+            catalog: Catalog backend for structured data operations.
+            root_path: Root path name for path resolution.
+            volume_protocol_args: Filesystem protocol configurations.
+            default_volume_protocol: Default protocol for unspecified fields.
+
+        Note:
+            Automatically configures filesystem protocols and validates
+            the path against the schema.
+        """
         super().__init__(root_type, get_cleaned_path(path, root_path))
         self.catalog = catalog
         # self.storage_path = storage_path

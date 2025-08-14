@@ -18,6 +18,31 @@ from pond.transforms.abstract_transform import (  # AbstractTransform,
 
 
 class Transform(AbstractExecuteTransform):
+    """Basic transform for scalar input/output processing.
+
+    Handles simple one-to-one data transformations where inputs and outputs
+    are scalar values (not arrays). Performs type validation between the
+    function signature and catalog schema paths.
+
+    This transform is automatically selected by the @node decorator when
+    neither input nor output paths contain array wildcards \"[:]\".
+
+    Example:
+        @node(Catalog, \"params.resolution\", \"grid.cell_size\")
+        def scale_resolution(res: float) -> float:
+            return res * 2.0
+        # Creates a Transform instance
+
+    Attributes:
+        fn: The wrapped function to execute.
+        input_lenses: Ordered mapping of input path strings to LensInfo objects.
+        output_lenses: Ordered mapping of output path strings to LensInfo objects.
+
+    Note:
+        Type validation ensures function parameter types match catalog schema types.
+        The is_list_fold parameter is used internally for type checking context.
+    """
+
     # TODO: make inputs/outputs work with dicts also
     def __init__(
         self,
@@ -27,6 +52,27 @@ class Transform(AbstractExecuteTransform):
         fn: Callable,
         is_list_fold: bool = False,
     ):
+        """Initialize a Transform with type validation.
+
+        Args:
+            Catalog: Pydantic model class defining the data schema.
+            input: Input path(s) as string or list of strings. Should not
+                contain array wildcards for basic Transform.
+            output: Output path(s) as string or list of strings. Should not
+                contain array wildcards for basic Transform.
+            fn: Function to wrap. Must have type annotations that match
+                the data types at the specified input/output paths.
+            is_list_fold: Internal flag for type checking context when
+                used in list fold operations.
+
+        Raises:
+            RuntimeError: If function lacks return type annotation.
+            AssertionError: If function parameter types don't match catalog schema.
+
+        Note:
+            Performs comprehensive type validation using beartype to ensure
+            function signature compatibility with catalog schema types.
+        """
         self.fn = fn
         inputs = input if isinstance(input, list) else [input]
         outputs = output if isinstance(output, list) else [output]
@@ -84,24 +130,66 @@ class Transform(AbstractExecuteTransform):
                 warnings.warn(str(m))
 
     def get_name(self) -> str:
+        """Get the name of the wrapped function.
+
+        Returns:
+            The __name__ attribute of the wrapped function.
+        """
         return self.fn.__name__
 
     def get_docs(self) -> str:
+        """Get the documentation string of the wrapped function.
+
+        Returns:
+            The __doc__ attribute of the wrapped function, or empty string if None.
+        """
         return self.fn.__doc__ if self.fn.__doc__ is not None else ""
 
     def get_fn(self) -> Callable:
+        """Get the wrapped function.
+
+        Returns:
+            The callable function that implements the transform logic.
+        """
         return self.fn
 
     def get_inputs(self) -> list[LensPath]:
+        """Get the input paths for this transform.
+
+        Returns:
+            List of LensPath objects extracted from the input lenses.
+        """
         return [i.lens_path for i in self.input_lenses.values()]
 
     def get_outputs(self) -> list[LensPath]:
+        """Get the output paths for this transform.
+
+        Returns:
+            List of LensPath objects extracted from the output lenses.
+        """
         return [o.lens_path for o in self.output_lenses.values()]
 
     def get_transforms(self) -> list[AbstractExecuteTransform]:
+        """Get the list of transforms contained in this transform.
+
+        Returns:
+            List containing only this transform (since Transform is atomic).
+        """
         return [self]
 
     def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:
+        """Create the executable units for this transform.
+
+        Args:
+            state: Pipeline state (not used for basic transforms).
+
+        Returns:
+            List containing a single ExecuteTransform unit wrapping the function.
+
+        Note:
+            Basic transforms always create exactly one execute unit since they
+            handle scalar input/output without array expansion.
+        """
         return [
             ExecuteTransform(
                 inputs=[i.lens_path for i in self.input_lenses.values()],
