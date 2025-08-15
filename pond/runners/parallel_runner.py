@@ -12,6 +12,24 @@ from pond.transforms.transform_pipe import TransformPipe
 
 
 def execute_unit(state: State, unit: AbstractExecuteUnit, t: int, lock):
+    """Execute a single unit in a separate process.
+
+    This function is called by the process pool to execute individual
+    transform units. Uses a lock to ensure thread-safe commits to the catalog.
+
+    Args:
+        state: Pipeline state with catalog access.
+        unit: The execute unit to run.
+        t: Transform index for tracking completion.
+        lock: Multiprocessing lock for thread-safe catalog commits.
+
+    Returns:
+        Tuple of (unit, transform_index) for completion tracking.
+
+    Note:
+        The lock ensures that catalog commits are atomic across processes.
+        Only the commit operation is locked, not the entire execution.
+    """
     args = unit.load_inputs(state)
     rtns = unit.run(args)
     values = unit.save_outputs(state, rtns)
@@ -21,15 +39,57 @@ def execute_unit(state: State, unit: AbstractExecuteUnit, t: int, lock):
 
 
 class ParallelRunner(AbstractRunner):
+    """Parallel pipeline execution runner with dependency resolution.
+
+    Executes pipeline transforms in parallel while respecting data dependencies.
+    Uses a process pool to run independent transforms concurrently and employs
+    dependency tracking to ensure correct execution order.
+
+    Execution Strategy:
+    - Analyzes transform dependencies based on input/output paths
+    - Schedules transforms for parallel execution when dependencies are met
+    - Uses multiprocessing with spawn context for process isolation
+    - Employs locks for thread-safe catalog commits
+
+    Features:
+    - Automatic dependency resolution
+    - Parallel execution of independent transforms
+    - Full hook integration with proper timing
+    - Error handling with cleanup
+
+    Note:
+        Uses spawn context for better cross-platform compatibility.
+        Maximum worker count is currently hardcoded to 10.
+    """
+
     def __init__(self):
+        """Initialize a parallel runner."""
         super().__init__()
 
     def run(self, state: State, pipe: TransformPipe, hooks: list[AbstractHook]):
+        """Execute the pipeline in parallel with dependency resolution.
+
+        Args:
+            state: Pipeline state containing catalog and configuration.
+            pipe: The transform pipeline to execute.
+            hooks: List of hooks called at each execution stage.
+
+        Raises:
+            RuntimeError: If any transform fails during parallel execution.
+
+        Note:
+            Uses ProcessPoolExecutor with spawn context for process isolation.
+            Transforms are scheduled as soon as their dependencies are satisfied.
+            Catalog commits are synchronized using multiprocessing locks.
+        """
+        # Initialize hooks and pipeline state
         for hook in hooks:
             hook.initialize(state.root_type)
             hook.pre_pipe_execute(pipe)
         error = None
         success = True
+
+        # Set up dependency tracking
         transforms = dict(enumerate(pipe.get_transforms()))
         dependencies = {
             t: transform.get_inputs() for t, transform in transforms.items()
@@ -38,8 +98,6 @@ class ParallelRunner(AbstractRunner):
         inputs = pipe.get_inputs()
         produced = list(inputs)
         futures = set()
-        # done_noes = set()
-
         execute_units_finished = {}
 
         with multiprocessing.Manager() as m:

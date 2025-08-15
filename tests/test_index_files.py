@@ -66,15 +66,15 @@ def test_index_files(
         volume_protocol_args,
     )
     value = lens.get()
-    assert value.path == "catalog/drives/test_1/navigation"
-    assert value.get() == catalog.drives[1].navigation.get()
+    assert value.path == "catalog/drives/test_0/navigation"
+    assert value.get() == catalog.drives[0].navigation.get()
 
     lens = Lens(
         FileCatalog, "drives[1].images", data_catalog, root_path, volume_protocol_args
     )
     value = lens.get()
-    assert value.path == "catalog/drives/test_0/images"
-    assert value.get() == catalog.drives[0].images.get()
+    assert value.path == "catalog/drives/test_1/images"
+    assert value.get() == catalog.drives[1].images.get()
 
     # lens = Lens(FileCatalog, "drives", data_catalog, root_path, storage_path)
     # value = lens.get()
@@ -128,9 +128,9 @@ def test_state_index_files(
     assert value.get() == catalog.values.get()
 
     value = state["drives[0].navigation"]
-    assert value.path == "catalog/drives/test_1/navigation"
-    assert value.get() == catalog.drives[1].navigation.get()
+    assert value.path == "catalog/drives/test_0/navigation"
+    assert value.get() == catalog.drives[0].navigation.get()
 
     value = state["drives[1].images"]
-    assert value.path == "catalog/drives/test_0/images"
-    assert value.get() == catalog.drives[0].images.get()
+    assert value.path == "catalog/drives/test_1/images"
+    assert value.get() == catalog.drives[1].images.get()

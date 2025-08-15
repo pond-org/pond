@@ -23,6 +23,24 @@ EntryType = BaseModel | List[BaseModel] | BasicType | List[BasicType]
 
 
 def get_pyarrow_schema(t: Type) -> pa.Schema:
+    """Convert a Python type to a PyArrow schema.
+
+    Converts pydantic model types and basic Python types to equivalent
+    PyArrow schemas for catalog storage. Handles both single types and
+    list types appropriately.
+
+    Args:
+        t: The Python type to convert. Can be a pydantic BaseModel subclass,
+            basic type (str, int, float, bool), or list type.
+
+    Returns:
+        PyArrow schema representing the type structure.
+
+    Note:
+        For list types, extracts the element type and creates schema for that.
+        For non-BaseModel types, wraps in a 'value' field schema.
+        Uses pydantic-to-pyarrow for BaseModel conversion.
+    """
     settings = pydantic_to_pyarrow.schema.Settings(
         allow_losing_tz=False,
         by_alias=False,
@@ -47,6 +65,25 @@ def get_pyarrow_schema(t: Type) -> pa.Schema:
 def get_tree_type(
     path: list[TypeField], root_type: Type[BaseModel]
 ) -> tuple[Type[BaseModel], dict]:
+    """Navigate a type hierarchy to find the type at a specific path.
+
+    Traverses the pydantic model type hierarchy following the given path
+    to determine the final type and associated metadata.
+
+    Args:
+        path: List of TypeField components representing the navigation path.
+            Modified in-place during traversal.
+        root_type: The root pydantic model class to start navigation from.
+
+    Returns:
+        Tuple containing:
+        - The final type at the path location
+        - Dictionary of extra arguments/metadata from field definitions
+
+    Note:
+        Handles array indexing by unwrapping list types when index is specified.
+        Recursively processes nested model structures.
+    """
     if not path:
         return root_type, {}
     field = path.pop(0)
@@ -67,6 +104,22 @@ def get_tree_type(
 
 
 def get_cleaned_path(path: str, root_path: str) -> LensPath:
+    """Parse and clean a path string into a LensPath object.
+
+    Handles variant prefixes in path strings and creates appropriate
+    LensPath objects with the correct variant annotation.
+
+    Args:
+        path: Path string, optionally prefixed with variant like 'table:path.field'.
+        root_path: Root path name for the LensPath.
+
+    Returns:
+        LensPath object with the appropriate variant set.
+
+    Note:
+        Variant prefixes like 'table:', 'file:', etc. are extracted and
+        set as the LensPath variant. Default variant is 'default'.
+    """
     if matches := parse("{:l}:{}", path):
         variant, path = matches
     else:
@@ -75,6 +128,15 @@ def get_cleaned_path(path: str, root_path: str) -> LensPath:
     return lens_path
 
 
+"""Mapping of Python types to PyArrow types.
+
+Defines the conversion mapping for basic Python types to their
+equivalent PyArrow type representations for catalog storage.
+
+Note:
+    Used as fallback for types not handled by pydantic-to-pyarrow.
+    Covers common Python types and datetime variants.
+"""
 FIELD_MAP = {
     str: pa.string(),
     bytes: pa.binary(),
@@ -88,11 +150,33 @@ FIELD_MAP = {
 
 
 class LensInfo:
+    """Information about a lens path including type and metadata.
+
+    Encapsulates the path information and resolved type for a specific
+    location in the data catalog. Used by transforms for type validation
+    and by the lens system for data access.
+
+    Attributes:
+        lens_path: The LensPath specifying the data location.
+        type: The resolved Python type at the path location.
+        extra_args: Metadata dictionary from field definitions.
+
+    Note:
+        The type resolution considers variants and array indexing to
+        determine the actual data type that will be accessed.
+    """
+
     def __init__(
         self,
         root_type: Type[BaseModel],
         lens_path: LensPath,
     ):
+        """Initialize LensInfo by resolving path type information.
+
+        Args:
+            root_type: The root pydantic model class.
+            lens_path: The path to resolve type information for.
+        """
         self.lens_path = lens_path
         self.type, self.extra_args = get_tree_type(self.lens_path.path[1:], root_type)
 
@@ -102,10 +186,47 @@ class LensInfo:
         path: str,
         root_path: str = "catalog",
     ) -> "LensInfo":
+        """Create a LensInfo from a path string.
+
+        Convenience method to create LensInfo objects by parsing path strings
+        and resolving type information from the root schema.
+
+        Args:
+            root_type: The root pydantic model class defining the schema.
+            path: Dot-separated path string with optional variant prefix.
+                Examples: "params.value", "table:clouds[:].points".
+            root_path: Root path name for LensPath creation. Defaults to "catalog".
+
+        Returns:
+            LensInfo instance with resolved type information.
+
+        Note:
+            This is the primary way to create LensInfo objects from user-provided
+            path strings. Handles variant parsing and type resolution automatically.
+        """
         lens_path = get_cleaned_path(path, root_path)
         return LensInfo(root_type, lens_path)
 
     def set_index(self, index: int, value: int):
+        """Set the array index at a specific position in the path.
+
+        Modifies the array index for a path component that contains list data.
+        Used to navigate to specific items within array fields.
+
+        Args:
+            index: Position in the path (0-based) where the array index should be set.
+            value: Array index to set. Use -1 for wildcard (all items),
+                or non-negative integers for specific item indices.
+
+        Raises:
+            AssertionError: If index is negative, if the path component at the
+                specified position doesn't support indexing, or if value is invalid.
+
+        Note:
+            The path component must already be configured for array access
+            (index is not None) before calling this method. Wildcard index -1
+            indicates all items in the array.
+        """
         assert index >= 0
         assert self.lens_path.path[index].index is not None, (
             "Lens only supports setting index for list item lenses"
@@ -114,6 +235,25 @@ class LensInfo:
         self.lens_path.path[index].index = value
 
     def get_type(self) -> Type:
+        """Get the resolved type considering the lens variant.
+
+        Returns the actual Python type that will be returned when accessing
+        data through this lens, taking into account the variant annotation.
+
+        Returns:
+            The resolved type:
+            - "default" variant: Returns the schema type as-is
+            - "file" variant: Unwraps File[T] types to return T or list[T]
+            - "table" variant: Returns pa.Table for PyArrow table access
+
+        Raises:
+            RuntimeError: If the lens uses an unsupported variant.
+            AssertionError: If "file" variant is used with non-File types.
+
+        Note:
+            For "file" variant, File[T] becomes T and list[File[T]] becomes list[T].
+            This allows transparent access to the underlying file contents.
+        """
         if self.lens_path.variant == "default":
             return self.type
         elif self.lens_path.variant == "file":
@@ -132,6 +272,30 @@ class LensInfo:
 
 
 class Lens(LensInfo):
+    """Primary interface for accessing and manipulating data in pond catalogs.
+
+    The Lens provides a unified interface for reading and writing data at specific
+    paths in the catalog hierarchy. It handles both structured data (stored in
+    catalogs) and unstructured data (stored as files), with automatic conversion
+    between Python objects and catalog storage formats.
+
+    Key Features:
+    - Path-based data access with variant support (default, table, file)
+    - Automatic type conversion and validation
+    - File system integration via fsspec
+    - Lazy loading and efficient data access
+    - Support for both scalar and array data
+
+    Attributes:
+        catalog: The catalog backend for structured data storage.
+        volume_protocol_args: Configuration for filesystem protocols.
+        default_volume_protocol: Default protocol when none specified.
+
+    Note:
+        Lenses are typically created via State.lens() rather than directly.
+        The lens system is the primary way to interact with pond data.
+    """
+
     def __init__(
         self,
         root_type: Type[BaseModel],
@@ -141,6 +305,20 @@ class Lens(LensInfo):
         volume_protocol_args: dict[str, Any] = {},
         default_volume_protocol: str = "dir",
     ):
+        """Initialize a Lens for the specified path.
+
+        Args:
+            root_type: The root pydantic model class defining the schema.
+            path: Dot-separated path string specifying the data location.
+            catalog: Catalog backend for structured data operations.
+            root_path: Root path name for path resolution.
+            volume_protocol_args: Filesystem protocol configurations.
+            default_volume_protocol: Default protocol for unspecified fields.
+
+        Note:
+            Automatically configures filesystem protocols and validates
+            the path against the schema.
+        """
         super().__init__(root_type, get_cleaned_path(path, root_path))
         self.catalog = catalog
         # self.storage_path = storage_path
@@ -156,12 +334,44 @@ class Lens(LensInfo):
         # self.fs = fsspec.filesystem(**self.volume_protocol_args)
 
     def len(self) -> int:
+        """Get the number of items at this lens path.
+
+        For array paths, returns the count of items in the array.
+        For scalar paths, returns 1 if data exists, 0 if not.
+
+        Returns:
+            Number of items accessible through this lens.
+
+        Note:
+            Uses the catalog backend to determine the count efficiently
+            without loading the actual data.
+        """
         return self.catalog.len(self.lens_path)
 
     def exists(self) -> bool:
+        """Check if data exists at this lens path.
+
+        Returns:
+            True if data has been written to this path, False otherwise.
+
+        Note:
+            This is a lightweight check that doesn't load the actual data.
+            Uses the catalog metadata to determine existence.
+        """
         return self.catalog.exists(self.lens_path)
 
     def index_files(self):
+        """Index file system files into the catalog.
+
+        Scans the file system for files matching the schema expectations
+        and creates catalog entries for them. Used to synchronize the
+        catalog with existing files on disk.
+
+        Note:
+            Uses the path from extra_args if specified, otherwise derives
+            the path from the lens path. Recursively processes nested
+            structures to index all files in the hierarchy.
+        """
         if self.extra_args and self.extra_args.get("path", None):
             file_path = self.extra_args["path"]
         else:
@@ -176,6 +386,25 @@ class Lens(LensInfo):
     def index_files_impl(
         self, path: list[TypeField], file_path: str, model_type: Type, extra_args: dict
     ):
+        """Implementation for recursive file indexing.
+
+        Recursively processes file system structures to create catalog entries
+        for File types and nested model structures. Handles different patterns
+        like single files, file arrays, and nested directory structures.
+
+        Args:
+            path: Current path components being processed.
+            file_path: File system path to scan for files.
+            model_type: Expected type structure for validation.
+            extra_args: Field metadata containing file extensions and protocols.
+
+        Note:
+            This is the core implementation that handles:
+            - Single File types with specific extensions
+            - Arrays of File types with directory listings
+            - Nested BaseModel structures with recursive processing
+            - Wildcard pattern matching for flexible file discovery
+        """
         # lens_path = ""  # TODO
         per_row = False
         if _generics.get_origin(model_type) == File:
@@ -209,6 +438,8 @@ class Lens(LensInfo):
                 listing = list(listing_dict.values())
             else:
                 listing = fs.ls(file_path, detail=True)
+            # Sort listing by filename to ensure deterministic order across environments
+            listing = sorted(listing, key=lambda x: x["name"])
             values = []
             for info in listing:
                 if (
@@ -240,6 +471,8 @@ class Lens(LensInfo):
                 listing = list(listing_dict.values())
             else:
                 listing = fs.ls(file_path, detail=True)
+            # Sort listing by filename to ensure deterministic order across environments
+            listing = sorted(listing, key=lambda x: x["name"])
             counter = 0
             for info in listing:
                 if info["type"] == "directory":
@@ -266,6 +499,20 @@ class Lens(LensInfo):
                 )
 
     def get_file_paths(self, model: Any, extra_args: dict):
+        """Load file contents for File objects in the model.
+
+        Recursively traverses model structures and loads the actual file
+        contents for any File objects encountered, using the appropriate
+        filesystem protocol and reader function.
+
+        Args:
+            model: Model instance or data structure to process.
+            extra_args: Field metadata containing reader, extension, and protocol info.
+
+        Note:
+            Modifies File objects in-place by setting their 'object' attribute
+            with the loaded content. Uses fsspec for filesystem abstraction.
+        """
         if isinstance(model, File):
             reader = extra_args["reader"]
             ext = extra_args["ext"]
@@ -281,6 +528,24 @@ class Lens(LensInfo):
                 self.get_file_paths(value, extra_args)
 
     def get(self) -> None | list[BaseModel] | BaseModel:
+        """Load data from the catalog at this lens path.
+
+        Retrieves data from the catalog, converts it to the appropriate Python
+        types, and handles file loading and variant transformations.
+
+        Returns:
+            The data at this path:
+            - None if no data exists
+            - Single BaseModel instance for scalar data
+            - List of BaseModel instances for array data
+            - PyArrow Table for "table" variant
+            - Unwrapped file contents for "file" variant
+
+        Note:
+            Automatically loads file contents for File types and applies
+            variant-specific transformations. The return type depends on
+            both the schema type and the lens variant.
+        """
         table, is_query = self.catalog.load_table(self.lens_path)
         if table is None:
             return None
@@ -362,6 +627,23 @@ class Lens(LensInfo):
         return rtn
 
     def set_file_paths(self, path: str, model: Any, extra_args: dict) -> bool:
+        """Save file contents and set file paths in the model.
+
+        Recursively processes model structures to save File object contents
+        to the filesystem and update their path attributes.
+
+        Args:
+            path: Base file system path for saving files.
+            model: Model instance or data structure to process.
+            extra_args: Field metadata containing writer, extension, and protocol info.
+
+        Returns:
+            True if any File objects were processed, False otherwise.
+
+        Note:
+            Saves file contents using the specified writer function and updates
+            File object paths. For arrays, uses indexed subdirectories.
+        """
         if isinstance(model, File):
             model.path = path
             writer = extra_args["writer"]
@@ -389,6 +671,25 @@ class Lens(LensInfo):
         return False
 
     def create_table(self, value: EntryType) -> pa.Table:
+        """Create a PyArrow table from the provided value.
+
+        Converts Python objects to PyArrow table format for catalog storage,
+        handling file operations and type conversions as needed.
+
+        Args:
+            value: Data to convert. Can be BaseModel, list, or basic types.
+
+        Returns:
+            PyArrow table ready for catalog storage.
+
+        Raises:
+            RuntimeError: If the value type cannot be converted to table format
+                or if variant requirements are not met.
+
+        Note:
+            For "file" variant, wraps values in File objects and saves to disk.
+            For "table" variant, expects value to already be a PyArrow table.
+        """
         # TODO: check that value is of type self.type
         schema = get_pyarrow_schema(self.type)
         field_type = self.type  # type(value)
@@ -445,6 +746,19 @@ class Lens(LensInfo):
         return table
 
     def write_table(self, table: pa.Table, append: bool = False) -> bool:
+        """Write a PyArrow table to the catalog.
+
+        Args:
+            table: PyArrow table to write.
+            append: If True, append to existing data. If False, overwrite.
+
+        Returns:
+            True if write was successful.
+
+        Note:
+            Handles array index management for append operations by adjusting
+            the write path when necessary.
+        """
         per_row = False
         # return self.catalog.write_table(value, self.lens_path, schema, per_row=per_row)
         write_path = self.lens_path.path
@@ -456,5 +770,21 @@ class Lens(LensInfo):
         )
 
     def set(self, value: EntryType, append: bool = False) -> bool:
+        """Store data at this lens path.
+
+        Converts the provided value to catalog format and stores it at the
+        path location, handling file operations and type conversions.
+
+        Args:
+            value: Data to store. Type must match the lens schema type.
+            append: If True, append to existing array data. If False, overwrite.
+
+        Returns:
+            True if storage was successful.
+
+        Note:
+            This is the primary method for storing data through lenses.
+            Automatically handles file saving, type conversion, and catalog storage.
+        """
         table = self.create_table(value)
         return self.write_table(table, append=append)

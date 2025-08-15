@@ -32,6 +32,8 @@ extend-exclude = ["docs/*"]
 
 [dependency-groups]
 dev = [
+    "mkdocs-material>=9.6.16",
+    "mkdocstrings[python]>=0.30.0",
     "mypy>=1.16.1",
     "types-pyyaml>=6.0.12.20250516",
 ]

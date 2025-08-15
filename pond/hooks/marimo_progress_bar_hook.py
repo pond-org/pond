@@ -8,11 +8,41 @@ from pond.transforms.abstract_transform import AbstractExecuteTransform
 
 
 class MarimoProgressBarHook(AbstractHook):
+    """Progress bar hook for Marimo notebook integration.
+
+    This hook provides visual progress tracking for PyPond pipeline execution
+    within Marimo notebooks. It displays a progress bar that updates as
+    transforms complete, showing current status and any errors that occur.
+
+    Attributes:
+        progress_bar: Marimo progress bar widget for visual feedback.
+
+    Note:
+        This hook is specifically designed for use within Marimo notebooks
+        and requires the marimo package. The progress bar automatically
+        tracks pipeline execution and provides real-time feedback to users.
+    """
+
     def __init__(self):
+        """Initialize the Marimo progress bar hook.
+
+        Sets up the hook with no active progress bar initially.
+        The progress bar will be created when pipeline execution begins.
+        """
         super().__init__()
         self.progress_bar = None
 
     def pre_pipe_execute(self, pipe: TransformPipe):
+        """Initialize progress bar before pipeline execution begins.
+
+        Args:
+            pipe: The transform pipeline about to be executed.
+
+        Note:
+            Creates a new Marimo progress bar widget with the total number
+            of transforms to be executed. The progress bar shows an initial
+            status indicating the pipeline is starting.
+        """
         nbr_transforms = len(pipe.get_transforms())
         self.progress_bar = mo.status.progress_bar(
             total=nbr_transforms,
@@ -23,6 +53,20 @@ class MarimoProgressBarHook(AbstractHook):
     def post_node_execute(
         self, node: AbstractExecuteTransform, success: bool, error: Optional[Exception]
     ):
+        """Update progress bar after each transform execution.
+
+        Args:
+            node: The transform that just finished executing.
+            success: Whether the transform executed successfully.
+            error: Exception that occurred during execution, if any.
+
+        Note:
+            Updates the progress bar with current status:
+            - Success: Shows "Finished {transform_name}" with running status
+            - Failure: Shows "Error on {transform_name}" with failed status
+
+            The progress automatically advances by one step with each update.
+        """
         if success:
             self.progress_bar.progress.update(
                 title="Running", subtitle=f"Finished {node.get_name()}"
@@ -35,6 +79,21 @@ class MarimoProgressBarHook(AbstractHook):
     def post_pipe_execute(
         self, pipe: TransformPipe, success: bool, error: Optional[Exception]
     ):
+        """Finalize progress bar after pipeline execution completes.
+
+        Args:
+            pipe: The transform pipeline that finished executing.
+            success: Whether the entire pipeline executed successfully.
+            error: Exception that occurred during pipeline execution, if any.
+
+        Note:
+            Updates the progress bar with final status and closes it:
+            - Success: Shows "Run successful" with completion message
+            - Failure: Shows "Failed" status
+
+            Always closes the progress bar to clean up the UI widget
+            regardless of execution outcome.
+        """
         if success:
             self.progress_bar.progress.update(
                 increment=0,

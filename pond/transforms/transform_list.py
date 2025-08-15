@@ -11,6 +11,32 @@ from pond.transforms.transform import Transform
 # NOTE: this is actually a superset of the functionality
 # in transform, so we could use the same unit tests for that part
 class TransformList(Transform):
+    """Transform for processing arrays with array output (one-to-one mapping).
+
+    Extends Transform to handle array inputs with array outputs, processing
+    each element independently. This transform is automatically selected by
+    the @node decorator when both input and output paths contain \"[:]\".
+
+    Example:
+        @node(Catalog, \"clouds[:].raw_points\", \"clouds[:].filtered_points\")
+        def filter_points(points: list[Point]) -> list[Point]:
+            return [p for p in points if p.z > 0]
+        # Creates a TransformList instance
+
+    Processing Pattern:
+        - Input: clouds[0].raw_points, clouds[1].raw_points, ...
+        - Function called once per array element
+        - Output: clouds[0].filtered_points, clouds[1].filtered_points, ...
+
+    Attributes:
+        input_inds: List of wildcard indices in input paths (should contain -1).
+        output_inds: List of wildcard indices in output paths (should contain -1).
+
+    Note:
+        Requires at least one wildcard in both input and output paths.
+        Creates multiple execute units at runtime based on array length.
+    """
+
     def __init__(
         self,
         Catalog: Type[BaseModel],
@@ -18,6 +44,21 @@ class TransformList(Transform):
         output: list[str] | str,
         fn: Callable,
     ):
+        """Initialize a TransformList with wildcard validation.
+
+        Args:
+            Catalog: Pydantic model class defining the data schema.
+            input: Input path(s) containing at least one \"[:]\" wildcard.
+            output: Output path(s) containing at least one \"[:]\" wildcard.
+            fn: Function to apply to each array element.
+
+        Raises:
+            ValueError: If no wildcards found in inputs or outputs.
+
+        Note:
+            The function signature must match the element types, not the array types.
+            For example, if input is list[Point], function should accept Point.
+        """
         super().__init__(Catalog, input, output, fn)
         self.input_inds = []
         self.output_inds = []
@@ -51,6 +92,24 @@ class TransformList(Transform):
             raise ValueError("Transform list did not get any outputs with wildcard!")
 
     def get_execute_units(self, state: State) -> list[AbstractExecuteUnit]:
+        """Create execute units for each array element.
+
+        Determines the length of input arrays and creates one execute unit
+        per array element. All input arrays must have the same length.
+
+        Args:
+            state: Pipeline state used to determine array lengths.
+
+        Returns:
+            List of ExecuteTransform units, one per array element.
+
+        Raises:
+            AssertionError: If input arrays have different lengths.
+
+        Note:
+            Array lengths are determined by checking existing data in the catalog.
+            If the parent array doesn't exist, iterates through indices to find length.
+        """
         input_lengths = {}
         for (name, input_lens), path_index in zip(
             self.input_lenses.items(), self.input_inds
