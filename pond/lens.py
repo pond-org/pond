@@ -438,6 +438,8 @@ class Lens(LensInfo):
                 listing = list(listing_dict.values())
             else:
                 listing = fs.ls(file_path, detail=True)
+            # Sort listing by filename to ensure deterministic order across environments
+            listing = sorted(listing, key=lambda x: x["name"])
             values = []
             for info in listing:
                 if (
@@ -469,6 +471,8 @@ class Lens(LensInfo):
                 listing = list(listing_dict.values())
             else:
                 listing = fs.ls(file_path, detail=True)
+            # Sort listing by filename to ensure deterministic order across environments
+            listing = sorted(listing, key=lambda x: x["name"])
             counter = 0
             for info in listing:
                 if info["type"] == "directory":

@@ -71,9 +71,9 @@ def test_transform_index(
     assert value.get() == catalog.values.get()
 
     value = state["drives[0].navigation"]
-    assert value.path == "catalog/drives/test_1/navigation"
-    assert value.get() == catalog.drives[1].navigation.get()
+    assert value.path == "catalog/drives/test_0/navigation"
+    assert value.get() == catalog.drives[0].navigation.get()
 
     value = state["drives[1].images"]
-    assert value.path == "catalog/drives/test_0/images"
-    assert value.get() == catalog.drives[0].images.get()
+    assert value.path == "catalog/drives/test_1/images"
+    assert value.get() == catalog.drives[1].images.get()
