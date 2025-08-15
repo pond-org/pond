@@ -34,13 +34,45 @@ from pond.transforms.transform_index import TransformIndex
 from pond.transforms.transform_pipe import TransformPipe
 
 LONG_SCALE = float(0xFFFFFFFFFFFFFFF)
+"""Large scale constant used for hash normalization.
+
+Used to convert hash values to floating point numbers in the range [0, 1]
+for deterministic sampling operations.
+"""
 
 
 def get_node_name(name: str, task_id: Optional[str]) -> str:
+    """Generate a node name for Hamilton tracking.
+
+    Args:
+        name: Base name of the transform/node.
+        task_id: Optional task identifier for parallel execution.
+
+    Returns:
+        Combined node name, either the base name or prefixed with task_id.
+
+    Note:
+        Used to create unique node names for Hamilton UI when transforms
+        are executed in parallel with different task identifiers.
+    """
     return name if task_id is None else f"{task_id}-{name}"
 
 
 def _convert_classifications(transform: AbstractExecuteTransform) -> list[str]:
+    """Convert PyPond transform to Hamilton node classifications.
+
+    Args:
+        transform: PyPond transform to classify.
+
+    Returns:
+        List of string classifications for Hamilton UI display.
+        Currently returns ["data_loader"] for TransformIndex,
+        ["transform"] for other transforms.
+
+    Note:
+        Classifications help Hamilton UI categorize and display
+        different types of pipeline nodes appropriately.
+    """
     out = []
     # if (
     #     node_.tags.get("hamilton.data_loader")
@@ -66,6 +98,22 @@ def _convert_node_dependencies(
     transform_dict: dict[str, AbstractExecuteTransform],
     deps: set[str],
 ) -> dict:
+    """Convert PyPond dependencies to Hamilton dependency format.
+
+    Args:
+        root_type: Root pydantic model type for type resolution.
+        transform: Transform whose dependencies are being converted.
+        transform_dict: Mapping of transform names to transform objects.
+        deps: Set of dependency names (transform names or input paths).
+
+    Returns:
+        Dictionary containing Hamilton-compatible dependency information
+        with dependency names, type specifications, and schema versions.
+
+    Note:
+        Resolves dependency types by checking if they are transforms
+        (with output types) or external inputs (with schema types).
+    """
     dependencies = []
     dependency_specs = []
     dependency_specs_type = "python_type"
@@ -98,10 +146,21 @@ def _extract_node_templates_from_function_graph(
     dependencies: dict[str, set[str]],
     inputs: dict[str, Type],
 ) -> list[dict]:
-    """Converts a function graph to a list of nodes that the DAGWorks graph can understand.
+    """Convert PyPond transforms to Hamilton node templates.
 
-    @param fn: Function graph to convert
-    @return: A list of node objects
+    Args:
+        root_type: Root pydantic model type for the pipeline.
+        transforms: List of PyPond transforms to convert.
+        dependencies: Mapping of transform names to their dependencies.
+        inputs: External inputs to the pipeline with their types.
+
+    Returns:
+        List of dictionaries containing Hamilton node template information
+        including names, types, documentation, and dependencies.
+
+    Note:
+        Creates Hamilton-compatible node definitions for both transforms
+        and external inputs, enabling visualization and tracking in Hamilton UI.
     """
     transform_dict = {transform.get_name(): transform for transform in transforms}
     node_templates = []
@@ -147,10 +206,21 @@ def _extract_node_templates_from_function_graph(
 def extract_code_artifacts_from_function_graph(
     transforms: list[AbstractExecuteTransform], vcs_info: GitInfo, repo_base_path: str
 ) -> list[dict]:
-    """Converts a function graph to a list of code artifacts that the function graph uses.
+    """Extract source code artifacts from PyPond transforms.
 
-    @param fn_graph: Function graph to convert.
-    @return: A list of node objects.
+    Args:
+        transforms: List of transforms to extract code from.
+        vcs_info: Git repository information for URL generation.
+        repo_base_path: Base path of the repository for relative paths.
+
+    Returns:
+        List of dictionaries containing code artifact information including
+        function names, file paths, line numbers, and repository URLs.
+
+    Note:
+        Extracts source code information for Hamilton UI to display
+        code locations and enable navigation to source files.
+        Handles decorated functions by unwrapping to find actual source.
     """
     seen = set()
     out = []
@@ -201,10 +271,21 @@ def extract_code_artifacts_from_function_graph(
 def extract_code_artifacts_from_inputs(
     inputs: dict[str, Type], vcs_info: GitInfo, repo_base_path: str
 ) -> list[dict]:
-    """Converts a function graph to a list of code artifacts that the function graph uses.
+    """Extract source code artifacts from pipeline input types.
 
-    @param fn_graph: Function graph to convert.
-    @return: A list of node objects.
+    Args:
+        inputs: Dictionary mapping input names to their Python types.
+        vcs_info: Git repository information for URL generation.
+        repo_base_path: Base path of the repository for relative paths.
+
+    Returns:
+        List of dictionaries containing code artifact information for
+        input type definitions including class names, file paths, and URLs.
+
+    Note:
+        Extracts type definition information for Hamilton UI to show
+        where input types are defined in the codebase.
+        Skips built-in types that don't have source files.
     """
     seen = set()
     out = []
@@ -255,6 +336,20 @@ def extract_code_artifacts_from_inputs(
 def _slurp_code(
     transforms: list[AbstractExecuteTransform], repo_base: str
 ) -> list[dict]:
+    """Read complete source files containing transform functions.
+
+    Args:
+        transforms: List of transforms to extract source modules from.
+        repo_base: Base repository path for relative path calculation.
+
+    Returns:
+        List of dictionaries containing full source file contents
+        with relative file paths for Hamilton UI code viewing.
+
+    Note:
+        Reads entire Python modules containing transform functions
+        to provide complete source context in Hamilton UI.
+    """
     modules = set()
     for transform in transforms:
         module = inspect.getmodule(transform.get_fn())
@@ -275,6 +370,19 @@ def add_dependency(
     transforms: list[AbstractExecuteTransform],
     dependencies: dict[str, set[str]],
 ):
+    """Add a dependency to a transform based on path availability.
+
+    Args:
+        transform_name: Name of the transform that needs the dependency.
+        path: LensPath representing the required data.
+        transforms: List of all transforms in the pipeline.
+        dependencies: Dictionary to update with the new dependency.
+
+    Note:
+        Searches through all transforms to find which one produces
+        the required path, then adds that transform as a dependency.
+        Uses subset relationships to handle array wildcards correctly.
+    """
     for transform in transforms:
         outputs = transform.get_outputs()
         for o in outputs:
@@ -287,6 +395,21 @@ def compute_dependencies(
     transforms: list[AbstractExecuteTransform],
     inputs: dict[str, Type],
 ) -> dict[str, set[str]]:
+    """Compute dependency graph for all transforms in the pipeline.
+
+    Args:
+        transforms: List of all transforms in the pipeline.
+        inputs: External inputs available to the pipeline.
+
+    Returns:
+        Dictionary mapping transform names to sets of their dependencies
+        (either other transform names or external input names).
+
+    Note:
+        Analyzes each transform's input requirements and determines
+        which other transforms or external inputs satisfy those requirements.
+        Essential for Hamilton UI to understand execution dependencies.
+    """
     dependencies: dict[str, set[str]] = {}
     for transform in transforms:
         name = transform.get_name()
@@ -303,6 +426,22 @@ def compute_dependencies(
 def process_result(
     transform: AbstractExecuteTransform,
 ) -> tuple[Optional[ObservationType], Optional[ObservationType], list[ObservationType]]:
+    """Process transform execution results for Hamilton observability.
+
+    Args:
+        transform: The executed transform to process results for.
+
+    Returns:
+        Tuple containing:
+        - Statistics observability data (or None)
+        - Schema observability data (or None)
+        - List of additional observability data
+
+    Note:
+        Currently returns a disabled result summary placeholder.
+        This function provides a hook for future result processing
+        and observability data extraction.
+    """
     schema = None
     additional: list[ObservationType] = []
     statistics = {
@@ -330,17 +469,26 @@ class UIHook(AbstractHook):
         verify: Union[str, bool] = True,
         run_id: str = "dev",
     ):
-        """This hooks into Hamilton execution to track DAG runs in Hamilton UI.
+        """Initialize the Hamilton UI integration hook.
 
-        :param project_id: the ID of the project
-        :param username: the username for the API key.
-        :param dag_name: the name of the DAG.
-        :param tags: any tags to help curate and organize the DAG
-        :param client_factory: a factory to create the client to phone Hamilton with.
-        :param api_key: the API key to use. See us if you want to use this.
-        :param hamilton_api_url: API endpoint.
-        :param hamilton_ui_url: UI Endpoint.
-        :param verify: SSL verification to pass-through to requests
+        This hook integrates PyPond pipeline execution with Hamilton UI for
+        monitoring, visualization, and tracking of pipeline runs.
+
+        Args:
+            project_id: The ID of the Hamilton project to track runs under.
+            username: The username for Hamilton API authentication.
+            dag_name: The name of the DAG/pipeline for display in Hamilton UI.
+            tags: Dictionary of tags to help curate and organize the DAG.
+            api_key: The API key for Hamilton authentication. Optional.
+            hamilton_api_url: Hamilton API endpoint URL. Defaults to localhost:8241.
+            hamilton_ui_url: Hamilton UI endpoint URL. Defaults to localhost:8241.
+            verify: SSL verification setting passed to requests library.
+            run_id: Identifier for this specific run. Defaults to "dev".
+
+        Note:
+            This hook requires a running Hamilton UI instance and proper
+            authentication credentials. The project must exist in Hamilton
+            before running pipelines with this hook.
         """
         self.project_id = project_id
         self.api_key = api_key
@@ -387,7 +535,11 @@ class UIHook(AbstractHook):
         self.seed: float | None = None
 
     def stop(self):
-        """Initiates stop if run in remote environment"""
+        """Stop the Hamilton client connection.
+
+        Initiates shutdown of the Hamilton client if running in a
+        remote environment. Used for cleanup when the hook is no longer needed.
+        """
         self.client.stop()
 
     def post_graph_construct(
@@ -395,7 +547,17 @@ class UIHook(AbstractHook):
         transforms: list[AbstractExecuteTransform],
         inputs: dict[str, Type],
     ):
-        """Registers the DAG to get an ID."""
+        """Register the pipeline DAG template with Hamilton.
+
+        Args:
+            transforms: List of transforms in the pipeline.
+            inputs: External inputs to the pipeline with their types.
+
+        Note:
+            Creates a DAG template in Hamilton with all transform information,
+            code artifacts, and dependency relationships. This template is
+            reused for multiple pipeline runs.
+        """
         if self.seed is None:
             self.seed = random.random()
         logger.debug("post_graph_construct")
@@ -441,7 +603,16 @@ class UIHook(AbstractHook):
         self,
         pipe: TransformPipe,
     ):
-        """Creates a DAG run."""
+        """Start a new DAG run in Hamilton UI.
+
+        Args:
+            pipe: The transform pipeline about to be executed.
+
+        Note:
+            Creates a new run instance in Hamilton UI and initializes
+            tracking state. Logs the Hamilton UI URL where results
+            can be viewed in real-time.
+        """
         logger.debug("pre_graph_execute %s", self.run_id)
         transforms = pipe.get_transforms()
         inputs = {
@@ -481,7 +652,16 @@ class UIHook(AbstractHook):
         # kwargs: dict[str, Any],
         # task_id: Optional[str] = None,
     ):
-        """Captures start of node execution."""
+        """Record the start of transform execution.
+
+        Args:
+            transform: The transform about to be executed.
+
+        Note:
+            Creates a task run record in Hamilton with start time,
+            dependencies, and sampling information. Updates the
+            Hamilton UI with execution status.
+        """
         task_id = None
         logger.debug("pre_node_execute %s %s", self.run_id, task_id)
         tracking_state = self.tracking_states[self.run_id]
@@ -513,22 +693,62 @@ class UIHook(AbstractHook):
         )
 
     def get_hash(self, block_value: int):
-        """Creates a deterministic hash."""
+        """Generate a deterministic hash for sampling decisions.
+
+        Args:
+            block_value: Integer value to generate hash for, typically a block ID.
+
+        Returns:
+            Integer hash value derived from seed, salt, and block value.
+            Used for deterministic sampling in parallel execution contexts.
+
+        Note:
+            Uses SHA-1 hashing with a salted seed to ensure consistent
+            sampling decisions across pipeline runs. The hash is truncated
+            to 15 hex digits for conversion to integer.
+        """
         full_salt = "%s.%s%s" % (self.seed, "POND", ".")
         hash_str = "%s%s" % (full_salt, str(block_value))
         hash_str_b = hash_str.encode("ascii")
         return int(hashlib.sha1(hash_str_b).hexdigest()[:15], 16)
 
     def get_deterministic_random(self, block_value: int):
-        """Gets a random number between 0 & 1 given the block value."""
+        """Generate a deterministic random number for sampling.
+
+        Args:
+            block_value: Integer value to generate random number for.
+
+        Returns:
+            Float value between 0 and 1, deterministically derived
+            from the block value using the hash function.
+
+        Note:
+            Normalizes the hash value by dividing by LONG_SCALE to
+            produce a consistent floating-point value in [0, 1) range.
+            Used for probabilistic sampling strategies.
+        """
         zero_to_one = self.get_hash(block_value) / LONG_SCALE
         return zero_to_one  # should be between 0 and 1
 
     def is_in_sample(self, task_id: Optional[str]) -> bool:
-        """Determines if what we're tracking is considered in sample.
+        """Determine whether a task should be included in sampling.
 
-        This should only be used at the node level right now and is intended
-        for parallel blocks that could be quick large.
+        Args:
+            task_id: Optional task identifier, typically for parallel execution.
+                Expected format for sampled tasks: "expand-{info}.block.{id}".
+
+        Returns:
+            True if the task should be sampled (tracked in detail),
+            False if it should be skipped for performance reasons.
+
+        Note:
+            Sampling strategies:
+            - Float strategy: Sample blocks probabilistically based on random value
+            - Int strategy: Sample every Nth block using modulo operation
+            - All non-parallel tasks are always included in sample
+
+            Used to reduce tracking overhead for large parallel workloads
+            while maintaining representative monitoring coverage.
         """
         if (
             self.special_parallel_sample_strategy is not None
@@ -568,7 +788,23 @@ class UIHook(AbstractHook):
         # result_type: Optional[Type],
         # task_id: Optional[str] = None,
     ):
-        """Captures end of node execution."""
+        """Record the completion of transform execution in Hamilton UI.
+
+        Args:
+            transform: The transform that just finished executing.
+            success: Whether the transform executed successfully.
+            error: Exception that occurred during execution, if any.
+
+        Note:
+            Updates Hamilton UI with:
+            - Task completion time and status (SUCCESS/FAILURE)
+            - Result summary or error traceback
+            - Additional observability data if available
+            - Forces sampling for failed tasks to ensure error visibility
+
+            The task update includes all attributes in the correct order
+            for optimal Hamilton UI display.
+        """
         task_id = None
         logger.debug("post_node_execute %s %s", self.run_id, task_id)
         name = transform.get_name()
@@ -669,7 +905,23 @@ class UIHook(AbstractHook):
         success: bool,
         error: Optional[Exception],
     ):
-        """Captures end of DAG execution."""
+        """Record the completion of pipeline execution in Hamilton UI.
+
+        Args:
+            pipe: The transform pipeline that finished executing.
+            success: Whether the entire pipeline executed successfully.
+            error: Exception that occurred during pipeline execution, if any.
+
+        Note:
+            Finalizes the Hamilton UI run record by:
+            - Setting final run status (SUCCESS/FAILURE)
+            - Updating end times for all tasks
+            - Handling aborted or incomplete tasks
+            - Logging the Hamilton UI URL for viewing results
+
+            Ensures all task states are properly finalized even if
+            the pipeline was interrupted or failed partway through.
+        """
         logger.debug("post_graph_execute %s", self.run_id)
         dw_run_id = self.dw_run_ids[self.run_id]
         tracking_state = self.tracking_states[self.run_id]
