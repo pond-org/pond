@@ -108,6 +108,13 @@ class ParallelRunner(AbstractRunner):
                 mp_context=SpawnContext(),
             ) as pool:
                 while True:
+                    # Check for cancellation before scheduling new transforms
+                    if any(hook.is_cancellation_requested() for hook in hooks):
+                        # Cancel all pending futures
+                        for future in futures:
+                            future.cancel()
+                        raise InterruptedError("Pipeline execution was canceled")
+
                     ready = {
                         t
                         for t in todo
