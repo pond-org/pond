@@ -1,5 +1,6 @@
 import datetime
 from typing import Any, List, Type, get_args, get_origin
+from functools import partial
 
 import fsspec  # type: ignore
 import pyarrow as pa  # type: ignore
@@ -514,11 +515,15 @@ class Lens(LensInfo):
             with the loaded content. Uses fsspec for filesystem abstraction.
         """
         if isinstance(model, File):
+            if not extra_args.get("reader", None):
+                model.loader = None
+                return
             reader = extra_args["reader"]
             ext = extra_args["ext"]
             protocol = extra_args["protocol"] or self.default_volume_protocol
             fs = fsspec.filesystem(**self.volume_protocol_args[protocol])
-            model.object = reader(fs, f"{model.path}.{ext}")  # type: ignore[attr-defined]
+            # model.object = reader(fs, f"{model.path}.{ext}")  # type: ignore[attr-defined]
+            model.loader = partial(reader, fs, f"{model.path}.{ext}")  # type: ignore[attr-defined]
         elif isinstance(model, list):
             for i, value in enumerate(model):
                 self.get_file_paths(value, extra_args)

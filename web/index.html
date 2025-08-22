@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyPond FastAPI Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            border-radius: 10px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        
+        .status.idle { background: #e3f2fd; }
+        .status.running { background: #fff3e0; }
+        .status.completed { background: #e8f5e8; }
+        .status.failed { background: #ffebee; }
+        
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            background: #2196F3;
+            color: white;
+        }
+        
+        button:hover {
+            background: #1976D2;
+        }
+        
+        .connect { background: #4CAF50; }
+        .disconnect { background: #f44336; }
+        .control { background: #ff9800; }
+        
+        input[type="number"] {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        
+        .connection-status {
+            padding: 5px 10px;
+            border-radius: 3px;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        
+        .connected {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+        
+        .disconnected {
+            background: #ffcdd2;
+            color: #c62828;
+        }
+        
+        .log {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 3px;
+            height: 150px;
+            overflow-y: scroll;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        code {
+            background: #f5f5f5;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>PyPond FastAPI Example</h1>
+    
+    <div class="section">
+        <h3>What this demonstrates:</h3>
+        <p>This page shows how to interact with a PyPond pipeline through a web interface. The pipeline processes point cloud data (.laz files) to generate heightmaps.</p>
+        <ol>
+            <li>Start the pipeline server: <code>uv run python example_fastapi.py</code></li>
+            <li>Connect to see real-time progress</li>
+            <li>Submit parameters and upload files</li>
+            <li>Watch the pipeline process your data</li>
+            <li>Download results when complete</li>
+        </ol>
+    </div>
+    
+    <!-- Connection Section: Establishes WebSocket connection for real-time updates -->
+    <div class="section">
+        <h3>1. Connect to Pipeline</h3>
+        <div class="connection-status disconnected" id="status">Disconnected</div>
+        <br>
+        <button class="connect" onclick="connect()">Connect WebSocket</button>
+        <button class="disconnect" onclick="disconnect()">Disconnect</button>
+        <button onclick="getStatus()">Check Status</button>
+    </div>
+    
+    <!-- Progress Section: Shows pipeline execution progress and current status -->
+    <div class="section">
+        <h3>2. Monitor Progress</h3>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progress"></div>
+        </div>
+        <div class="status idle" id="pipelineStatus">
+            <strong>Stage:</strong> <span id="stage">idle</span><br>
+            <strong>Progress:</strong> <span id="progressText">0/0 (0%)</span><br>
+            <strong>Current:</strong> <span id="current">None</span>
+        </div>
+    </div>
+    
+    <!-- Input Section: Submits data required by your pipeline's fastapi_input transforms -->
+    <div class="section">
+        <h3>3. Submit Pipeline Inputs</h3>
+        <p><strong>Parameters:</strong></p>
+        Resolution: <input type="number" id="resolution" value="4.0" step="0.1">
+        <button onclick="submitParams()">Submit Parameters</button>
+        
+        <p><strong>File Upload:</strong></p>
+        <input type="file" id="fileInput" accept=".laz,.las" multiple>
+        <button onclick="uploadFiles()">Upload Cloud Files</button>
+        <div id="fileStatus"></div>
+    </div>
+    
+    <!-- Control Section: Uses pipeline control endpoints for reset/cancel operations -->
+    <div class="section">
+        <h3>4. Pipeline Control</h3>
+        <button class="control" onclick="resetPipeline()">Reset Pipeline</button>
+        <button class="control" onclick="cancelPipeline()">Cancel Execution</button>
+        <button class="control" onclick="clearOutputs()">Clear Outputs</button>
+    </div>
+    
+    <!-- Output Section: Downloads results from your pipeline's fastapi_output transforms -->
+    <div class="section">
+        <h3>5. Get Results</h3>
+        <button onclick="downloadHeightmap()">Download Heightmap Image</button>
+        <button onclick="getBounds()">Get Bounds Data</button>
+        <div id="results"></div>
+    </div>
+    
+    <!-- Log Section: Shows activity and debugging information -->
+    <div class="section">
+        <h3>Activity Log</h3>
+        <div class="log" id="log"></div>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <script>
+        // Global variables for connection management
+        let ws = null;
+        const baseUrl = 'http://localhost:8000';  // Change this to match your server URL and port
+        
+        // Utility function to add timestamped messages to the activity log
+        function log(message) {
+            const time = new Date().toLocaleTimeString();
+            document.getElementById('log').innerHTML += `[${time}] ${message}\n`;
+            document.getElementById('log').scrollTop = document.getElementById('log').scrollHeight;
+        }
+        
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        // Updates the visual connection status indicator
+        function updateConnectionStatus(connected) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = connected ? 'Connected' : 'Disconnected';
+            statusEl.className = 'connection-status ' + (connected ? 'connected' : 'disconnected');
+        }
+        
+        // Updates the progress display with data from the FastAPIHook progress endpoints
+        function updateProgress(data) {
+            // Update progress bar percentage
+            document.getElementById('progress').style.width = (data.progress_percentage || 0) + '%';
+            
+            // Update stage text (idle, running, completed, failed, etc.)
+            document.getElementById('stage').textContent = data.stage || 'idle';
+            
+            // Update progress fraction and percentage
+            document.getElementById('progressText').textContent = 
+                `${data.completed_transforms || 0}/${data.total_transforms || 0} (${(data.progress_percentage || 0).toFixed(1)}%)`;
+            
+            // Update current transform being executed
+            document.getElementById('current').textContent = 
+                data.current_transform ? data.current_transform.name : 'None';
+            
+            // Update background color based on pipeline stage
+            const statusEl = document.getElementById('pipelineStatus');
+            statusEl.className = 'status ' + (data.stage || 'idle');
+        }
+        
+        // Establishes WebSocket connection to /progress/ws endpoint for real-time updates
+        function connect() {
+            if (ws) return;  // Prevent multiple connections
+            
+            ws = new WebSocket('ws://localhost:8000/progress/ws');
+            
+            ws.onopen = () => {
+                updateConnectionStatus(true);
+                log('Connected to pipeline');
+            };
+            
+            // Handle incoming progress updates from the FastAPIHook
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                updateProgress(data);
+                log(`Progress: ${data.stage} (${(data.progress_percentage || 0).toFixed(1)}%)`);
+            };
+            
+            ws.onclose = () => {
+                updateConnectionStatus(false);
+                log('Disconnected from pipeline');
+                ws = null;
+            };
+            
+            ws.onerror = () => {
+                log('Connection error - make sure the server is running');
+            };
+        }
+        
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+        
+        // Alternative to WebSocket: polls the /progress/status REST endpoint
+        async function getStatus() {
+            try {
+                const response = await fetch(`${baseUrl}/progress/status`);
+                const data = await response.json();
+                updateProgress(data);
+                log('Status updated');
+            } catch (error) {
+                log('Error getting status: ' + error.message);
+            }
+        }
+        
+        // Submits parameters to the /input/params endpoint (matches fastapi_input path)
+        async function submitParams() {
+            const resolution = parseFloat(document.getElementById('resolution').value);
+            
+            try {
+                const response = await fetch(`${baseUrl}/input/params`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ res: resolution })  // Match your pipeline's parameter structure
+                });
+                
+                if (response.ok) {
+                    log(`Parameters submitted: resolution = ${resolution}`);
+                } else {
+                    log('Error submitting parameters');
+                }
+            } catch (error) {
+                log('Error: ' + error.message);
+            }
+        }
+        
+        // Uploads files to the /input/cloud_files endpoint (matches fastapi_input path)
+        async function uploadFiles() {
+            const fileInput = document.getElementById('fileInput');
+            const files = fileInput.files;
+            
+            if (files.length === 0) {
+                log('No files selected');
+                return;
+            }
+            
+            // Upload all files in a single request using FormData
+            const formData = new FormData();
+            for (let file of files) {
+                formData.append('files', file);  // Use 'files' parameter for list[UploadFile]
+            }
+            
+            try {
+                log(`Uploading ${files.length} files...`);
+                const response = await fetch(`${baseUrl}/input/cloud_files`, {
+                    method: 'POST',
+                    body: formData  // No Content-Type header needed for FormData
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    log(`Successfully uploaded ${result.count} files: ${result.filenames.join(', ')}`);
+                    document.getElementById('fileStatus').textContent = `${result.count} files uploaded successfully`;
+                } else {
+                    const errorText = await response.text();
+                    log(`Upload failed: ${errorText}`);
+                    document.getElementById('fileStatus').textContent = 'Upload failed';
+                }
+            } catch (error) {
+                log('Upload error: ' + error.message);
+                document.getElementById('fileStatus').textContent = 'Upload error';
+            }
+        }
+        
+        // Calls the /pipeline/reset control endpoint to reset pipeline state
+        async function resetPipeline() {
+            try {
+                const response = await fetch(`${baseUrl}/pipeline/reset`, { method: 'POST' });
+                if (response.ok) {
+                    log('Pipeline reset');
+                } else {
+                    log('Failed to reset pipeline');
+                }
+            } catch (error) {
+                log('Reset error: ' + error.message);
+            }
+        }
+        
+        // Calls the /pipeline/cancel control endpoint to cancel running pipeline
+        async function cancelPipeline() {
+            try {
+                const response = await fetch(`${baseUrl}/pipeline/cancel`, { method: 'POST' });
+                if (response.ok) {
+                    log('Pipeline cancellation requested');
+                } else {
+                    log('Failed to cancel pipeline');
+                }
+            } catch (error) {
+                log('Cancel error: ' + error.message);
+            }
+        }
+        
+        // Calls the /pipeline/clear control endpoint to clear output data
+        async function clearOutputs() {
+            try {
+                const response = await fetch(`${baseUrl}/pipeline/clear`, { method: 'DELETE' });
+                if (response.ok) {
+                    log('Outputs cleared');
+                    document.getElementById('results').innerHTML = '';
+                } else {
+                    log('Failed to clear outputs');
+                }
+            } catch (error) {
+                log('Clear error: ' + error.message);
+            }
+        }
+        
+        // Downloads file output from /output/heightmap_plot endpoint (matches fastapi_output path)
+        async function downloadHeightmap() {
+            try {
+                const response = await fetch(`${baseUrl}/output/heightmap_plot`);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    
+                    // Trigger download using temporary link
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'heightmap.png';  // Set desired filename
+                    a.click();
+                    
+                    log('Heightmap downloaded');
+                } else {
+                    log('Heightmap not ready yet');
+                }
+            } catch (error) {
+                log('Download error: ' + error.message);
+            }
+        }
+        
+        // Gets JSON data from /output/bounds endpoint (matches fastapi_output path)
+        async function getBounds() {
+            try {
+                const response = await fetch(`${baseUrl}/output/bounds`);
+                if (response.ok) {
+                    const data = await response.json();
+                    // Display JSON data in formatted text
+                    document.getElementById('results').innerHTML = 
+                        '<h4>Bounds Data:</h4><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                    log('Bounds data retrieved');
+                } else {
+                    log('Bounds not ready yet');
+                }
+            } catch (error) {
+                log('Bounds error: ' + error.message);
+            }
+        }
+        
+        // Initialize the page
+        log('Page loaded - ready to connect to pipeline server');
+    </script>
+</body>
+</html>
