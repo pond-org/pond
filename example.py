@@ -5,7 +5,7 @@ os.environ["PYICEBERG_HOME"] = os.getcwd()  # noqa: E402
 
 from example.catalog import Catalog
 from example.pipeline import heightmap_pipe
-from pond import State
+from pond import State, pipe, index_files
 from pond.catalogs.iceberg_catalog import IcebergCatalog
 from pond.catalogs.lance_catalog import LanceCatalog
 from pond.hooks.ui_hook import UIHook
@@ -35,7 +35,14 @@ def main(args):
         case _:
             raise ValueError(f"{args.runner} not a valid runner")
     state["params.res"] = 4.0
-    pipeline = heightmap_pipe()
+    pipeline = pipe(
+        [
+            index_files(Catalog, "cloud_files"),
+            heightmap_pipe(),
+        ],
+        input="params",
+        output=["heightmap_plot", "bounds"],
+    )
     runner.run(state, pipeline, hooks)
 
 
