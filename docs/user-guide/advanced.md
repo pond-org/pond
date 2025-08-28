@@ -210,6 +210,44 @@ def cross_catalog_analysis():
 Use lenses for complex data manipulation:
 
 ```python
+import tempfile
+import numpy as np
+from pydantic import BaseModel
+from pond import State
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+
+# Setup catalog for example
+temp_dir = tempfile.mkdtemp(prefix="pypond_advanced_")
+catalog = IcebergCatalog(
+    "default",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+# Define example schema
+class DatasetMetadata(BaseModel):
+    status: str
+    priority: str
+
+class Dataset(BaseModel):
+    metadata: DatasetMetadata
+    raw_data: str
+    processed_data: str = ""
+
+class Catalog(BaseModel):
+    datasets: list[Dataset]
+    high_priority_results: list[str] = []
+
+state = State(Catalog, catalog)
+
+def process_dataset(raw_data: str) -> str:
+    return f"processed_{raw_data}"
+
+def batch_process(datasets: list[Dataset]) -> list[str]:
+    return [f"batch_processed_{d.raw_data}" for d in datasets]
+
 def advanced_lens_operations(state: State):
     # Conditional data processing
     datasets_lens = state.lens("datasets[:]")
@@ -219,7 +257,7 @@ def advanced_lens_operations(state: State):
         
         if dataset_lens.lens("metadata.status").get() == "pending":
             # Process only pending datasets
-            raw_data = dataset_lens.lens("file:raw_data").get()
+            raw_data = dataset_lens.lens("raw_data").get()
             processed = process_dataset(raw_data)
             dataset_lens.lens("processed_data").set(processed)
             dataset_lens.lens("metadata.status").set("completed")
@@ -246,10 +284,37 @@ def advanced_lens_operations(state: State):
 Handle large datasets with streaming patterns:
 
 ```python
-@node(Catalog, "table:large_dataset[:].chunks", "summary.statistics")
+import tempfile
+import pyarrow as pa
+import pyarrow.compute as pc
+from pydantic import BaseModel
+from pond import node
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+
+# Setup catalog for example
+temp_dir = tempfile.mkdtemp(prefix="pypond_streaming_")
+catalog = IcebergCatalog(
+    "default",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+# Define example schema
+class Summary(BaseModel):
+    statistics: dict
+
+class DataPoint(BaseModel):
+    value: float
+    category: str
+
+class Catalog(BaseModel):
+    summary: Summary
+    large_dataset: list[DataPoint] = []
+
+@node(Catalog, "table:large_dataset", "summary.statistics")
 def streaming_analysis(table: pa.Table) -> dict:
-    import pyarrow.compute as pc
-    
     # Process data in chunks to manage memory
     chunk_size = 10000
     total_rows = len(table)
@@ -287,6 +352,53 @@ def streaming_analysis(table: pa.Table) -> dict:
 Optimize file operations for parallel execution:
 
 ```python
+import tempfile
+import time
+import numpy as np
+from pydantic import BaseModel
+from pond import node, pipe
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+
+# Setup catalog for example
+temp_dir = tempfile.mkdtemp(prefix="pypond_parallel_")
+catalog = IcebergCatalog(
+    "default",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+# Define example models
+from pond import Field, File
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+
+class ProcessingResult(BaseModel):
+    features: list[float]
+    statistics: dict
+    insights: list[str]
+    metadata: dict
+
+class LargeFile(BaseModel):
+    data: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npz")
+
+class ProcessedFile(BaseModel):
+    results: ProcessingResult
+
+class Catalog(BaseModel):
+    processed_files: list[ProcessedFile] = []
+    large_files: list[LargeFile] = []
+
+def extract_features(data: np.ndarray) -> list[float]:
+    return [float(np.mean(data)), float(np.std(data))]
+
+def compute_statistics(data: np.ndarray) -> dict:
+    return {"size": len(data), "min": float(np.min(data)), "max": float(np.max(data))}
+
+def analyze_patterns(data: np.ndarray) -> list[str]:
+    return ["pattern1", "pattern2"]
+
 @node(Catalog, "file:large_files[:].data", "processed_files[:].results")
 def parallel_file_processor(data: np.ndarray) -> ProcessingResult:
     # This transform processes each file independently
@@ -304,6 +416,15 @@ def parallel_file_processor(data: np.ndarray) -> ProcessingResult:
         metadata={"processing_time": time.time()}
     )
 
+def index_large_files():
+    pass
+
+def aggregate_results():
+    pass
+
+def generate_summary_report():
+    pass
+
 def efficient_file_pipeline():
     return pipe([
         index_large_files,          # Discover files
@@ -318,6 +439,41 @@ def efficient_file_pipeline():
 Implement intelligent caching for expensive operations:
 
 ```python
+import tempfile
+from pydantic import BaseModel
+from pond import node
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+
+# Setup catalog for example
+temp_dir = tempfile.mkdtemp(prefix="pypond_cache_")
+catalog = IcebergCatalog(
+    "default",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+# Define example models
+class InputData(BaseModel):
+    value: float
+
+class OutputData(BaseModel):
+    result: float
+
+class Input(BaseModel):
+    data: InputData
+
+class Output(BaseModel):
+    processed: OutputData
+
+class Catalog(BaseModel):
+    input: Input
+    output: Output
+
+def expensive_computation(data: InputData) -> OutputData:
+    return OutputData(result=data.value * 2)
+
 class CachedTransform:
     def __init__(self, cache_path: str):
         self.cache_path = cache_path
@@ -352,6 +508,59 @@ def cached_transform(data: InputData) -> OutputData:
 Handle errors without stopping the entire pipeline:
 
 ```python
+import tempfile
+import logging
+from typing import Optional
+from pydantic import BaseModel
+from pond import node
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+
+# Setup catalog for example
+temp_dir = tempfile.mkdtemp(prefix="pypond_resilient_")
+catalog = IcebergCatalog(
+    "default",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+# Setup logger
+logger = logging.getLogger(__name__)
+
+# Define example models
+class RiskyData(BaseModel):
+    id: str
+    value: float
+
+class SafeResult(BaseModel):
+    success: bool
+    data: Optional[str]
+    error: Optional[str]
+
+class ProcessingSummary(BaseModel):
+    total_processed: int
+    successful_count: int
+    failed_count: int
+    success_rate: float
+    errors: list[str]
+
+class RiskyInput(BaseModel):
+    data: RiskyData
+
+class SafeOutput(BaseModel):
+    results: SafeResult
+
+class Catalog(BaseModel):
+    risky_inputs: list[RiskyInput] = []
+    safe_outputs: list[SafeOutput] = []
+    final_summary: ProcessingSummary
+
+def risky_processing(data: RiskyData) -> str:
+    if data.value < 0:
+        raise ValueError("Negative values not allowed")
+    return f"processed_{data.id}"
+
 @node(Catalog, "risky_inputs[:].data", "safe_outputs[:].results")
 def resilient_processor(data: RiskyData) -> SafeResult:
     try:
@@ -390,6 +599,43 @@ def summarize_results(results: list[SafeResult]) -> ProcessingSummary:
 Implement retry mechanisms for unreliable operations:
 
 ```python
+import tempfile
+import time
+from pydantic import BaseModel
+from pond import node
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+
+# Setup catalog for example
+temp_dir = tempfile.mkdtemp(prefix="pypond_retry_")
+catalog = IcebergCatalog(
+    "default",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+# Define example models
+class SourceData(BaseModel):
+    value: str
+
+class ProcessedData(BaseModel):
+    result: str
+
+class UnreliableSource(BaseModel):
+    data: SourceData
+
+class Processed(BaseModel):
+    result: ProcessedData
+
+class Catalog(BaseModel):
+    unreliable_source: UnreliableSource
+    processed: Processed
+
+def process_unreliable_source(data: SourceData) -> ProcessedData:
+    # Simulate unreliable processing
+    return ProcessedData(result=f"processed_{data.value}")
+
 def with_retry(max_attempts: int = 3, delay: float = 1.0):
     def decorator(func):
         def wrapper(*args, **kwargs):
@@ -409,10 +655,22 @@ def with_retry(max_attempts: int = 3, delay: float = 1.0):
     return decorator
 
 @node(Catalog, "unreliable_source.data", "processed.result")
-@with_retry(max_attempts=3, delay=1.0)
 def unreliable_transform(data: SourceData) -> ProcessedData:
-    # This might fail due to network issues, etc.
-    return process_unreliable_source(data)
+    # Apply retry logic manually to avoid decorator conflicts
+    max_attempts = 3
+    delay = 1.0
+    last_exception = None
+    
+    for attempt in range(max_attempts):
+        try:
+            return process_unreliable_source(data)
+        except Exception as e:
+            last_exception = e
+            if attempt < max_attempts - 1:
+                time.sleep(delay * (2 ** attempt))  # Exponential backoff
+                continue
+            else:
+                raise last_exception
 ```
 
 ## Advanced Hooks
@@ -422,6 +680,10 @@ def unreliable_transform(data: SourceData) -> ProcessedData:
 Create sophisticated monitoring hooks:
 
 ```python
+import time
+import json
+from pond.hooks.abstract_hook import AbstractHook
+
 class PerformanceMonitoringHook(AbstractHook):
     def __init__(self):
         self.metrics = {
@@ -433,15 +695,19 @@ class PerformanceMonitoringHook(AbstractHook):
         self.start_times = {}
     
     def pre_node_execute(self, transform):
-        import psutil
+        try:
+            import psutil
+        except ImportError:
+            psutil = None
         
         name = transform.get_name()
         self.start_times[name] = time.time()
         
-        # Record system metrics
-        process = psutil.Process()
-        self.metrics["memory_usage"][name] = process.memory_info().rss
-        self.metrics["cpu_usage"][name] = psutil.cpu_percent()
+        # Record system metrics if psutil available
+        if psutil:
+            process = psutil.Process()
+            self.metrics["memory_usage"][name] = process.memory_info().rss
+            self.metrics["cpu_usage"][name] = psutil.cpu_percent()
     
     def post_node_execute(self, transform, success, error):
         name = transform.get_name()
@@ -476,6 +742,10 @@ class PerformanceMonitoringHook(AbstractHook):
 Track data flow and transformations:
 
 ```python
+import time
+import json
+from pond.hooks.abstract_hook import AbstractHook
+
 class LineageTrackingHook(AbstractHook):
     def __init__(self):
         self.lineage_graph = {

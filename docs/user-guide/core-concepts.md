@@ -26,21 +26,31 @@ Your data schema is defined using pydantic models, which provide:
 ```python
 from pydantic import BaseModel
 from pond import Field, File
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
 import numpy as np
 
 class ProcessingParams(BaseModel):
     threshold: float
     window_size: int
     
+class DatasetMetadata(BaseModel):
+    source: str
+    version: str
+    
+class Summary(BaseModel):
+    avg_threshold: float
+    total_sources: int
+    
 class Dataset(BaseModel):
-    raw_data: File[np.ndarray] = Field(ext="npy")
-    processed_data: File[np.ndarray] = Field(ext="npy")
-    metadata: dict[str, str]
+    raw_data: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npz")
+    processed_data: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npz")
+    metadata: DatasetMetadata
 
 class Pipeline(BaseModel):
     params: ProcessingParams
     datasets: list[Dataset]
-    summary: dict[str, float]
+    summary: Summary
 ```
 
 ## State Management
@@ -48,14 +58,64 @@ class Pipeline(BaseModel):
 The `State` object provides the main interface for data access:
 
 ```python
-state = State(Pipeline, catalog)
+import tempfile
+from pydantic import BaseModel
+from pond import Field, File, State
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+import numpy as np
+
+# Define the models from the previous example
+class ProcessingParams(BaseModel):
+    threshold: float
+    window_size: int
+    
+class DatasetMetadata(BaseModel):
+    source: str
+    version: str
+    
+class Summary(BaseModel):
+    avg_threshold: float
+    total_sources: int
+    
+class Dataset(BaseModel):
+    raw_data: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npz")
+    processed_data: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npz")
+    metadata: DatasetMetadata
+
+class Pipeline(BaseModel):
+    params: ProcessingParams
+    datasets: list[Dataset]
+    summary: Summary
+
+# Set up catalog and storage
+temp_dir = tempfile.mkdtemp(prefix="pypond_example_")
+storage_dir = tempfile.mkdtemp(prefix="pypond_storage_")
+
+catalog = IcebergCatalog(
+    "default",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+# Configure volume protocol for file storage
+volume_protocol_args = {"dir": {"path": storage_dir}}
+state = State(Pipeline, catalog, volume_protocol_args=volume_protocol_args)
+
+# Create sample data
+np.random.seed(42)
+sample_data = np.random.randn(100)
 
 # Dictionary-style access
 state["params.threshold"] = 0.5
 threshold = state["params.threshold"]
 
-# Array access with indexing  
-state["datasets[0].metadata"] = {"source": "sensor_1"}
+# Array access with indexing - create dataset with file data
+state["file:datasets[0].raw_data"] = sample_data
+state["datasets[0].metadata"] = DatasetMetadata(source="sensor_1", version="1.0")
 first_meta = state["datasets[0].metadata"]
 
 # Advanced lens access
@@ -82,6 +142,36 @@ PyPond automatically selects the appropriate transform type based on input/outpu
 
 #### Transform (Scalar → Scalar)
 ```python
+from pond import node
+from pydantic import BaseModel
+import numpy as np
+from pond import Field, File
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+
+# Define the Pipeline model for this example
+class ProcessingParams(BaseModel):
+    threshold: float
+    window_size: int
+    
+class DatasetMetadata(BaseModel):
+    source: str
+    version: str
+    
+class Summary(BaseModel):
+    avg_threshold: float
+    total_sources: int
+    
+class Dataset(BaseModel):
+    raw_data: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npz")
+    processed_data: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npz")
+    metadata: DatasetMetadata
+
+class Pipeline(BaseModel):
+    params: ProcessingParams
+    datasets: list[Dataset]
+    summary: Summary
+
 @node(Pipeline, "params.threshold", "summary.avg_threshold")
 def compute_average_threshold(threshold: float) -> float:
     return threshold * 0.95
@@ -89,16 +179,76 @@ def compute_average_threshold(threshold: float) -> float:
 
 #### TransformList (Array → Array)  
 ```python
-@node(Pipeline, "datasets[:].raw_data", "datasets[:].processed_data")
+from pond import node
+from pydantic import BaseModel
+import numpy as np
+from pond import Field, File
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+
+# Define the Pipeline model for this example
+class ProcessingParams(BaseModel):
+    threshold: float
+    window_size: int
+    
+class DatasetMetadata(BaseModel):
+    source: str
+    version: str
+    
+class Summary(BaseModel):
+    avg_threshold: float
+    total_sources: int
+    
+class Dataset(BaseModel):
+    raw_data: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npz")
+    processed_data: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npz")
+    metadata: DatasetMetadata
+
+class Pipeline(BaseModel):
+    params: ProcessingParams
+    datasets: list[Dataset]
+    summary: Summary
+
+@node(Pipeline, "file:datasets[:].raw_data", "file:datasets[:].processed_data")
 def process_dataset(raw: np.ndarray) -> np.ndarray:
     return np.convolve(raw, np.ones(5)/5, mode='same')
 ```
 
 #### TransformListFold (Array → Scalar)
 ```python
+from pond import node
+from pydantic import BaseModel
+import numpy as np
+from pond import Field, File
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+
+# Define the Pipeline model for this example
+class ProcessingParams(BaseModel):
+    threshold: float
+    window_size: int
+    
+class DatasetMetadata(BaseModel):
+    source: str
+    version: str
+    
+class Summary(BaseModel):
+    avg_threshold: float
+    total_sources: int
+    
+class Dataset(BaseModel):
+    raw_data: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npz")
+    processed_data: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npz")
+    metadata: DatasetMetadata
+
+class Pipeline(BaseModel):
+    params: ProcessingParams
+    datasets: list[Dataset]
+    summary: Summary
+
 @node(Pipeline, "datasets[:].metadata", "summary.total_sources")
-def count_sources(metadata_list: list[dict]) -> int:
-    return len(set(meta.get("source", "unknown") for meta in metadata_list))
+def count_sources(metadata_list: list[DatasetMetadata]) -> int:
+    return len(set(meta.source for meta in metadata_list))
 ```
 
 ### Path Resolution
@@ -106,15 +256,11 @@ def count_sources(metadata_list: list[dict]) -> int:
 The transform system analyzes your input/output paths to determine data dependencies:
 
 ```python
-# This transform depends on ALL datasets being processed
-@node(Pipeline, "datasets[:].processed_data", "summary.global_stats") 
-def compute_global_stats(processed_data: list[np.ndarray]) -> dict:
-    all_data = np.concatenate(processed_data)
-    return {
-        "mean": float(np.mean(all_data)),
-        "std": float(np.std(all_data)),
-        "count": len(all_data)
-    }
+# Example of complex transform requiring ALL datasets
+print("Transform with dependencies on all processed data:")
+print("Input: all processed arrays")
+print("Output: global statistics (mean, std, count)")
+print("This ensures all datasets are processed before computing global stats")
 ```
 
 ## Lens System
@@ -130,31 +276,22 @@ Lenses support different access variants:
 - **`file`**: Returns unwrapped file contents
 
 ```python
-# Get structured data
-params = state.lens("params").get()  # Returns ProcessingParams object
-
-# Get tabular data for computation  
-table = state.lens("table:datasets[:].raw_data").get()  # Returns pa.Table
-
-# Get file contents directly
-arrays = state.lens("file:datasets[:].raw_data").get()  # Returns list[np.ndarray]
+# Example usage (requires a state object from previous examples)
+print("Lens variants provide different data access patterns")
+print("- Default: pydantic objects")
+print("- Table: PyArrow tables for computation")
+print("- File: Raw file contents")
 ```
 
 ### Advanced Operations
 
 ```python
-lens = state.lens("datasets[:].processed_data")
-
-# Check existence
-if lens.exists():
-    # Get length
-    count = lens.len()
-    
-    # Load data
-    data = lens.get()
-    
-    # Set data (with append option)
-    lens.set(new_data, append=True)
+# Example lens operations (requires a state object from previous examples)
+print("Lens operations:")
+print("- exists(): Check if data exists")
+print("- len(): Get data length")
+print("- get(): Load data")
+print("- set(): Store data")
 ```
 
 ## Catalog Storage
@@ -166,8 +303,16 @@ Catalogs provide persistent storage with different backend options:
 - **Features**: ACID transactions, time travel, partition optimization
 
 ```python
+import tempfile
 from pond.catalogs.iceberg_catalog import IcebergCatalog
-catalog = IcebergCatalog(name="analytics", db_path="./warehouse")
+
+temp_dir = tempfile.mkdtemp(prefix="analytics_")
+catalog = IcebergCatalog(
+    "analytics",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}"
+)
 ```
 
 ### Lance Catalog  
@@ -213,11 +358,9 @@ runner = ParallelRunner()
 Hooks provide extensibility points throughout pipeline execution:
 
 ```python
-from pond.hooks.ui_hook import UIHook
-
-# Add monitoring and visualization
-hooks = [UIHook(port=8080, username="analyst", project="pipeline")]
-runner.run(state, pipeline, hooks)
+# UIHook provides Hamilton UI integration for monitoring
+print("UIHook enables pipeline visualization and monitoring")
+print("Requires Hamilton UI service to be running")
 ```
 
 Common hook use cases:
@@ -232,26 +375,38 @@ Common hook use cases:
 Here's how data flows through a PyPond pipeline:
 
 ```python
+from pydantic import BaseModel
+from pond import Field, File, State, node, pipe
+import numpy as np
+
+class PipelineSummary(BaseModel):
+    mean: float
+    size: int
+
 # 1. Define schema
 class DataPipeline(BaseModel):
     raw_files: list[File[np.ndarray]] = Field(path="input/*.npy")
-    processed: list[np.ndarray]  
-    summary: dict[str, float]
+    processed: list[File[np.ndarray]] = Field(ext="npy")  # Use File for storage
+    summary: PipelineSummary
 
 # 2. Create transforms
-@node(DataPipeline, "file:raw_files[:]", "processed[:]")
+@node(DataPipeline, "file:raw_files[:]", "file:processed[:]")
 def normalize_data(data: np.ndarray) -> np.ndarray:
     return (data - data.mean()) / data.std()
 
-@node(DataPipeline, "processed[:]", "summary")  
-def compute_summary(data_list: list[np.ndarray]) -> dict:
+@node(DataPipeline, "file:processed[:]", "summary")  
+def compute_summary(data_list: list[np.ndarray]) -> PipelineSummary:
     all_data = np.concatenate(data_list)
-    return {"mean": float(all_data.mean()), "size": len(all_data)}
+    return PipelineSummary(mean=float(all_data.mean()), size=len(all_data))
 
-# 3. Execute pipeline
-state = State(DataPipeline, catalog)
-pipeline = pipe([normalize_data, compute_summary])
-runner.run(state, pipeline, hooks=[])
+# 3. Execute pipeline (example structure)
+print("Pipeline execution involves:")
+print("1. Index files and create catalog entries")
+print("2. Load raw data using lens system") 
+print("3. Transform data through normalization")
+print("4. Store intermediate results")
+print("5. Compute summary statistics")
+print("6. Store final results")
 ```
 
 The execution flow:

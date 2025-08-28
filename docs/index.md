@@ -56,7 +56,15 @@ def my_pipeline():
     ], input="params")
 
 # Execute the pipeline
-catalog = IcebergCatalog(name="default")
+import tempfile
+temp_dir = tempfile.mkdtemp(prefix="pypond_quickstart_")
+catalog = IcebergCatalog(
+    "quickstart_example",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
 state = State(Catalog, catalog)
 
 # Set input parameters using state accessors

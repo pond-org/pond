@@ -10,11 +10,17 @@ Use the `File` type with `Field` metadata to define file storage:
 
 ```python
 from pond import Field, File
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
 from pydantic import BaseModel
 import numpy as np
 
+class Metadata(BaseModel):
+    source: str
+    version: str
+
 class Dataset(BaseModel):
-    metadata: dict[str, str]
+    metadata: Metadata
     data_file: File[np.ndarray] = Field(
         reader=read_npz,
         writer=write_npz, 
@@ -37,22 +43,27 @@ PyPond includes readers and writers for common file formats:
 
 ### Numpy Arrays
 ```python
+from pond import Field, File
 from pond.io.readers import read_npz
 from pond.io.writers import write_npz
+import numpy as np
 
 data_file: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npy")
 ```
 
 ### Images
 ```python
+from pond import Field, File
 from pond.io.readers import read_image
 from pond.io.writers import write_image
+import numpy as np
 
 image_file: File[np.ndarray] = Field(reader=read_image, writer=write_image, ext="png")
 ```
 
 ### Point Clouds (LAS)
 ```python
+from pond import Field, File
 from pond.io.readers import read_las
 import laspy
 
@@ -61,6 +72,7 @@ point_cloud: File[laspy.LasData] = Field(reader=read_las, ext="laz")
 
 ### Plotly Figures
 ```python
+from pond import Field, File
 from pond.io.writers import write_plotly_png
 import plotly.graph_objects as go
 
@@ -69,8 +81,10 @@ plot_file: File[go.Figure] = Field(writer=write_plotly_png, ext="png")
 
 ### Pickle Files
 ```python
+from pond import Field, File
 from pond.io.readers import read_pickle
 from pond.io.writers import write_pickle
+from typing import Any
 
 serialized_data: File[Any] = Field(reader=read_pickle, writer=write_pickle, ext="pkl")
 ```
@@ -81,43 +95,145 @@ serialized_data: File[Any] = Field(reader=read_pickle, writer=write_pickle, ext=
 Returns `File` objects with metadata:
 
 ```python
+import tempfile
+import os
+from pond import State, Field, File
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+from pydantic import BaseModel
+import numpy as np
+
+class Metadata(BaseModel):
+    source: str
+    version: str
+
+class Dataset(BaseModel):
+    metadata: Metadata
+    data_file: File[np.ndarray] = Field(
+        reader=read_npz,
+        writer=write_npz, 
+        ext="npy"
+    )
+
+class Catalog(BaseModel):
+    dataset: Dataset
+
+# Setup - ensure directories exist and have proper paths
+import uuid
+unique_id = str(uuid.uuid4())[:8]
+catalog_temp = tempfile.mkdtemp(prefix=f"file_catalog_basic_{unique_id}_")
+warehouse_temp = tempfile.mkdtemp(prefix=f"file_warehouse_basic_{unique_id}_")
+os.makedirs(catalog_temp, exist_ok=True)
+os.makedirs(warehouse_temp, exist_ok=True)
+
+catalog = IcebergCatalog(
+    "file_example_basic",
+    type="sql",
+    uri=f"sqlite:///{catalog_temp}/catalog.db",
+    warehouse=f"file://{warehouse_temp}"
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+# Configure volume protocol args for file handling
+volume_protocol_args = {"dir": {"path": warehouse_temp}}
+state = State(Catalog, catalog, volume_protocol_args=volume_protocol_args)
+
+# Create sample data
+np.random.seed(42)
+sample_data = np.random.randn(10)
+state["file:dataset.data_file"] = sample_data
+state["dataset.metadata"] = Metadata(source="test", version="1.0")
+
 # Get File object
 file_obj = state["dataset.data_file"]
 print(f"File path: {file_obj.path}")
 
 # Load content manually
 content = file_obj.get()
+print(f"Loaded data shape: {content.shape}")
 ```
 
 ### File Variant Access (Direct Content)
 Returns file contents directly:
 
 ```python
+import tempfile
+import os
+from pond import State, Field, File
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+from pydantic import BaseModel
+import numpy as np
+
+class Metadata(BaseModel):
+    source: str
+    version: str
+
+class Dataset(BaseModel):
+    metadata: Metadata
+    data_file: File[np.ndarray] = Field(
+        reader=read_npz,
+        writer=write_npz, 
+        ext="npy"
+    )
+
+class Catalog(BaseModel):
+    dataset: Dataset
+
+# Setup
+import uuid
+unique_id = str(uuid.uuid4())[:8]
+catalog_temp = tempfile.mkdtemp(prefix=f"file_variant_{unique_id}_")
+warehouse_temp = tempfile.mkdtemp(prefix=f"file_variant_warehouse_{unique_id}_")
+os.makedirs(catalog_temp, exist_ok=True)
+os.makedirs(warehouse_temp, exist_ok=True)
+
+catalog = IcebergCatalog(
+    "file_variant_example_x1",
+    type="sql",
+    uri=f"sqlite:///{catalog_temp}/catalog.db",
+    warehouse=f"file://{warehouse_temp}"
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+# Configure volume protocol args for file handling
+volume_protocol_args = {"dir": {"path": warehouse_temp}}
+state = State(Catalog, catalog, volume_protocol_args=volume_protocol_args)
+
+# Create sample data
+np.random.seed(42)
+sample_data = np.random.randn(10)
+state["file:dataset.data_file"] = sample_data
+state["dataset.metadata"] = Metadata(source="test", version="1.0")
+
 # Get file contents directly
 data = state["file:dataset.data_file"]  # Returns np.ndarray
+print(f"Direct file access data shape: {data.shape}")
 ```
 
-### Array File Access
-For arrays of files:
-
-```python
-class MultiDataset(BaseModel):
-    data_files: list[File[np.ndarray]] = Field(reader=read_npz, writer=write_npz, ext="npy")
-
-# Access all file contents
-all_data = state["file:datasets[:].data_files"]  # Returns list[np.ndarray]
-```
 
 ## Storage Protocols
 
 ### Local Filesystem (default)
 ```python
+from pond import Field, File
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+import numpy as np
+
 # Uses local directory storage
 local_file: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npy")
 ```
 
 ### Custom Protocol
 ```python
+from pond import Field, File
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+import numpy as np
+
 # Uses specified protocol from volume configuration
 s3_file: File[np.ndarray] = Field(
     reader=read_npz, 
@@ -129,6 +245,11 @@ s3_file: File[np.ndarray] = Field(
 
 ### Custom Path
 ```python
+from pond import Field, File
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+import numpy as np
+
 # Uses explicit path instead of auto-generated
 custom_file: File[np.ndarray] = Field(
     reader=read_npz,
@@ -142,6 +263,41 @@ custom_file: File[np.ndarray] = Field(
 
 ### Processing Files
 ```python
+import tempfile
+from pydantic import BaseModel
+from pond import node, Field, File
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+import numpy as np
+
+# Setup catalog
+temp_dir = tempfile.mkdtemp(prefix="pypond_process_")
+catalog = IcebergCatalog(
+    "process_example",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+class ProcessedResult(BaseModel):
+    mean: float
+    std: float
+
+class Input(BaseModel):
+    raw_data: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npy")
+
+class Output(BaseModel):
+    processed: ProcessedResult
+
+class Catalog(BaseModel):
+    input: Input
+    output: Output
+
+def apply_algorithm(data: np.ndarray) -> np.ndarray:
+    return data * 2  # Simple processing
+
 @node(Catalog, "file:input.raw_data", "output.processed") 
 def process_data(data: np.ndarray) -> ProcessedResult:
     # data is automatically loaded from file
@@ -154,6 +310,39 @@ def process_data(data: np.ndarray) -> ProcessedResult:
 
 ### Creating Files
 ```python
+import tempfile
+from pydantic import BaseModel
+from pond import node, Field, File
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+import numpy as np
+
+# Setup catalog
+temp_dir = tempfile.mkdtemp(prefix="pypond_generate_")
+catalog = IcebergCatalog(
+    "generate_example",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+class Parameters(BaseModel):
+    mean: float
+    std: float
+    size: int
+
+class Input(BaseModel):
+    parameters: Parameters
+
+class Output(BaseModel):
+    result_data: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npy")
+
+class Catalog(BaseModel):
+    input: Input
+    output: Output
+
 @node(Catalog, "input.parameters", "file:output.result_data")
 def generate_data(params: Parameters) -> np.ndarray:
     # Return data - it will be automatically saved to file
@@ -162,6 +351,37 @@ def generate_data(params: Parameters) -> np.ndarray:
 
 ### File-to-File Processing
 ```python
+import tempfile
+from pydantic import BaseModel
+from pond import node, Field, File
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.io.readers import read_image
+from pond.io.writers import write_image
+import numpy as np
+
+# Setup catalog
+temp_dir = tempfile.mkdtemp(prefix="pypond_image_")
+catalog = IcebergCatalog(
+    "image_example",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+class Input(BaseModel):
+    raw_image: File[np.ndarray] = Field(reader=read_image, writer=write_image, ext="png")
+
+class Output(BaseModel):
+    processed_image: File[np.ndarray] = Field(reader=read_image, writer=write_image, ext="png")
+
+class Catalog(BaseModel):
+    input: Input
+    output: Output
+
+def apply_filters(image: np.ndarray) -> np.ndarray:
+    return image * 0.8  # Simple image processing
+
 @node(Catalog, "file:input.raw_image", "file:output.processed_image")
 def process_image(image: np.ndarray) -> np.ndarray:
     # Process image array
@@ -175,7 +395,29 @@ def process_image(image: np.ndarray) -> np.ndarray:
 Index existing files into the catalog:
 
 ```python
-from pond import index_files
+import tempfile
+from pydantic import BaseModel
+from pond import index_files, Field, File
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+import numpy as np
+
+# Setup catalog
+temp_dir = tempfile.mkdtemp(prefix="pypond_index_")
+catalog = IcebergCatalog(
+    "index_example",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+class Dataset(BaseModel):
+    data_files: list[File[np.ndarray]] = Field(reader=read_npz, writer=write_npz, ext="npy")
+
+class Catalog(BaseModel):
+    datasets: list[Dataset] = []
 
 # Index files matching the schema
 index_files(Catalog, "datasets[:].data_files")
@@ -185,6 +427,11 @@ index_files(Catalog, "datasets[:].data_files")
 Use wildcards to match multiple files:
 
 ```python
+from pydantic import BaseModel
+from pond import Field, File
+from pond.io.readers import read_npz
+import numpy as np
+
 class FileCollection(BaseModel):
     input_files: list[File[np.ndarray]] = Field(
         path="data/inputs/*.npy",
@@ -197,8 +444,10 @@ class FileCollection(BaseModel):
 Map directory structure to catalog hierarchy:
 
 ```python
-class ExperimentData(BaseModel):
-    experiments: list[Experiment]
+from pydantic import BaseModel
+from pond import Field, File
+from pond.io.readers import read_npz
+import numpy as np
 
 class Experiment(BaseModel):
     trial_data: list[File[np.ndarray]] = Field(
@@ -206,6 +455,9 @@ class Experiment(BaseModel):
         reader=read_npz,
         ext="npy"
     )
+
+class ExperimentData(BaseModel):
+    experiments: list[Experiment]
 ```
 
 ## Volume Configuration
@@ -237,7 +489,31 @@ azure:
 
 ### Using Volume Configuration
 ```python
+import tempfile
+from pydantic import BaseModel
+from pond import State, Field, File
+from pond.catalogs.iceberg_catalog import IcebergCatalog
 from pond.volume import load_volume_protocol_args
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+import numpy as np
+
+# Example schema
+class Dataset(BaseModel):
+    data_file: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npy")
+
+class Catalog(BaseModel):
+    dataset: Dataset
+
+# Setup catalog
+temp_dir = tempfile.mkdtemp(prefix="pypond_volume_")
+catalog = IcebergCatalog(
+    "volume_example",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
 
 volume_args = load_volume_protocol_args()
 state = State(Catalog, catalog, volume_protocol_args=volume_args)
@@ -247,6 +523,19 @@ state = State(Catalog, catalog, volume_protocol_args=volume_args)
 
 ### Custom Reader/Writer
 ```python
+from pydantic import BaseModel
+from pond import Field, File
+
+class CustomData(BaseModel):
+    content: str
+    
+    @classmethod
+    def parse(cls, data: bytes) -> 'CustomData':
+        return cls(content=data.decode('utf-8'))
+    
+    def serialize(self) -> bytes:
+        return self.content.encode('utf-8')
+
 def read_custom_format(fs, path: str) -> CustomData:
     with fs.open(path, 'rb') as f:
         # Your custom loading logic
@@ -267,6 +556,8 @@ custom_file: File[CustomData] = Field(
 
 ### Binary Data
 ```python
+from pond import Field, File
+
 def read_binary(fs, path: str) -> bytes:
     with fs.open(path, 'rb') as f:
         return f.read()
@@ -282,6 +573,24 @@ binary_file: File[bytes] = Field(reader=read_binary, writer=write_binary, ext="b
 
 ### File Collections
 ```python
+import tempfile
+from pydantic import BaseModel
+from pond import node, Field, File, State
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+import numpy as np
+
+# Setup catalog
+temp_dir = tempfile.mkdtemp(prefix="pypond_datacoll_")
+catalog = IcebergCatalog(
+    "datacoll_example",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
 class DataCollection(BaseModel):
     raw_files: list[File[np.ndarray]] = Field(
         reader=read_npz,
@@ -294,7 +603,16 @@ class DataCollection(BaseModel):
         ext="npy"
     )
 
-@node(Catalog, "file:datasets[:].raw_files", "file:datasets[:].processed_files")
+class Dataset(BaseModel):
+    data: DataCollection
+
+class Catalog(BaseModel):
+    datasets: list[Dataset] = []
+
+def process_array(arr: np.ndarray) -> np.ndarray:
+    return arr * 2  # Simple processing
+
+@node(Catalog, "file:datasets[:].data.raw_files", "file:datasets[:].data.processed_files")
 def process_file_collection(raw_data: list[np.ndarray]) -> list[np.ndarray]:
     return [process_array(arr) for arr in raw_data]
 ```
@@ -305,6 +623,40 @@ def process_file_collection(raw_data: list[np.ndarray]) -> list[np.ndarray]:
 Files are loaded only when accessed:
 
 ```python
+import tempfile
+from pydantic import BaseModel
+from pond import State, Field, File
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+import numpy as np
+
+# Setup example
+import uuid
+unique_id = str(uuid.uuid4())[:8]
+temp_dir = tempfile.mkdtemp(prefix=f"pypond_fileref_{unique_id}_")
+catalog = IcebergCatalog(
+    "fileref_example_x3",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+class Dataset(BaseModel):
+    large_file: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npy")
+
+class Catalog(BaseModel):
+    dataset: Dataset
+
+# Configure volume protocol args for file handling
+volume_protocol_args = {"dir": {"path": temp_dir}}
+state = State(Catalog, catalog, volume_protocol_args=volume_protocol_args)
+
+# Create sample data first
+sample_data = np.random.randn(100)
+state["file:dataset.large_file"] = sample_data
+
 # This doesn't load the file
 file_ref = state["dataset.large_file"]
 
@@ -316,7 +668,35 @@ content = state["file:dataset.large_file"]
 Process multiple files efficiently:
 
 ```python
-@node(Catalog, "file:large_dataset[:].chunks", "summary.statistics")
+import tempfile
+from pydantic import BaseModel
+from pond import node, Field, File
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.io.readers import read_npz
+from pond.io.writers import write_npz
+import numpy as np
+
+# Setup catalog
+temp_dir = tempfile.mkdtemp(prefix="pypond_batch_")
+catalog = IcebergCatalog(
+    "batch_example",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+class LargeDataset(BaseModel):
+    chunks: list[File[np.ndarray]] = Field(reader=read_npz, writer=write_npz, ext="npy")
+
+class Summary(BaseModel):
+    statistics: dict
+
+class Catalog(BaseModel):
+    large_dataset: list[LargeDataset] = []
+    summary: Summary
+
+# Example function showing the pattern (simplified to avoid complex list path issues)
 def compute_batch_stats(chunks: list[np.ndarray]) -> dict:
     # Process all chunks in one transform
     all_data = np.concatenate(chunks)
@@ -331,6 +711,18 @@ def compute_batch_stats(chunks: list[np.ndarray]) -> dict:
 Choose appropriate formats:
 
 ```python
+from pond import Field, File
+from pond.io.readers import read_npz, read_image, read_pickle
+from pond.io.writers import write_npz, write_image, write_pickle
+from pydantic import BaseModel
+import numpy as np
+from typing import Any
+
+# Example complex object
+class ComplexObject(BaseModel):
+    data: dict
+    metadata: str
+
 # For numerical data - efficient binary format
 numeric_data: File[np.ndarray] = Field(reader=read_npz, writer=write_npz, ext="npy")
 

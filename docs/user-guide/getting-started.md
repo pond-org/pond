@@ -40,7 +40,7 @@ class Parameters(BaseModel):
 
 class Results(BaseModel):
     filtered_count: int
-    processed_data: File[np.ndarray] = Field(ext="npy")
+    processed_data: list[float]
 
 class Catalog(BaseModel):
     params: Parameters
@@ -51,6 +51,22 @@ class Catalog(BaseModel):
 
 ```python
 from pond import node, pipe
+import numpy as np
+from pydantic import BaseModel
+from pond import Field, File
+
+# Redefine models for this block
+class Parameters(BaseModel):
+    threshold: float
+    multiplier: float
+
+class Results(BaseModel):
+    filtered_count: int
+    processed_data: list[float]
+
+class Catalog(BaseModel):
+    params: Parameters
+    results: Results
 
 @node(Catalog, "params.threshold", "results.filtered_count")
 def count_above_threshold(threshold: float) -> int:
@@ -59,8 +75,8 @@ def count_above_threshold(threshold: float) -> int:
     return int(np.sum(data > threshold))
 
 @node(Catalog, ["params.multiplier", "results.filtered_count"], "results.processed_data")
-def create_processed_data(multiplier: float, count: int) -> np.ndarray:
-    return np.full(count, multiplier)
+def create_processed_data(multiplier: float, count: int) -> list[float]:
+    return [multiplier] * count
 ```
 
 ### 3. Build a Pipeline
@@ -76,13 +92,53 @@ def my_pipeline():
 ### 4. Execute the Pipeline
 
 ```python
-from pond import State
+import tempfile
+import numpy as np
+from pydantic import BaseModel
+from pond import Field, File, State, node, pipe
 from pond.catalogs.iceberg_catalog import IcebergCatalog
 from pond.runners.sequential_runner import SequentialRunner
 
-# Set up state with catalog
-catalog = IcebergCatalog(name="my_catalog")
-state = State(Catalog, catalog)
+# Redefine models for this block
+class Parameters(BaseModel):
+    threshold: float
+    multiplier: float
+
+class Results(BaseModel):
+    filtered_count: int
+    processed_data: list[float]
+
+class Catalog(BaseModel):
+    params: Parameters
+    results: Results
+
+# Redefine transforms for this block
+@node(Catalog, "params.threshold", "results.filtered_count")
+def count_above_threshold(threshold: float) -> int:
+    # Your processing logic
+    data = np.random.randn(1000)
+    return int(np.sum(data > threshold))
+
+@node(Catalog, ["params.multiplier", "results.filtered_count"], "results.processed_data")
+def create_processed_data(multiplier: float, count: int) -> list[float]:
+    return [multiplier] * count
+
+def my_pipeline():
+    return pipe([
+        count_above_threshold,
+        create_processed_data,
+    ], input="params")
+
+# Set up state with catalog (using proper Iceberg configuration)
+temp_dir = tempfile.mkdtemp(prefix="pypond_example_")
+test_catalog = IcebergCatalog(
+    "default",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+test_catalog.catalog.create_namespace_if_not_exists("catalog")
+state = State(Catalog, test_catalog)
 
 # Set input parameters
 state["params.threshold"] = 0.5
@@ -95,9 +151,15 @@ runner.run(state, pipeline, hooks=[])
 
 # Get results
 count = state["results.filtered_count"]
-processed = state["results.processed_data"]  # This loads the numpy array
+processed = state["results.processed_data"]  # This loads the list
 print(f"Found {count} values above threshold")
-print(f"Processed data shape: {processed.shape}")
+print(f"Processed data length: {len(processed)}")
+
+# Verify results are reasonable
+assert isinstance(count, int)
+assert count > 0
+assert len(processed) == count
+assert all(x == 2.0 for x in processed)  # All values should be multiplier
 ```
 
 ## Key Concepts

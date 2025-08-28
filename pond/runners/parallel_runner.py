@@ -60,12 +60,19 @@ class ParallelRunner(AbstractRunner):
 
     Note:
         Uses spawn context for better cross-platform compatibility.
-        Maximum worker count is currently hardcoded to 10.
+        Worker count is configurable via max_workers parameter.
     """
 
-    def __init__(self):
-        """Initialize a parallel runner."""
+    def __init__(self, max_workers: int = 10):
+        """Initialize a parallel runner.
+
+        Args:
+            max_workers: Maximum number of worker processes to use. Defaults to 10.
+                        Set to 0 to use sequential execution (useful for debugging
+                        or testing environments where multiprocessing conflicts occur).
+        """
         super().__init__()
+        self.max_workers = max_workers
 
     def _is_fastapi_transform(self, transform) -> bool:
         """Conservative check for FastAPI transforms that can't be pickled."""
@@ -116,7 +123,16 @@ class ParallelRunner(AbstractRunner):
             Uses ProcessPoolExecutor with spawn context for process isolation.
             Transforms are scheduled as soon as their dependencies are satisfied.
             Catalog commits are synchronized using multiprocessing locks.
+            When max_workers=0, falls back to sequential execution to avoid
+            multiprocessing overhead and potential testing conflicts.
         """
+        # Special case: if max_workers=0, use sequential execution
+        if self.max_workers == 0:
+            from pond.runners.sequential_runner import SequentialRunner
+
+            sequential_runner = SequentialRunner()
+            return sequential_runner.run(state, pipe, hooks)
+
         # Initialize hooks and pipeline state
         for hook in hooks:
             hook.initialize(state.root_type)
@@ -138,7 +154,7 @@ class ParallelRunner(AbstractRunner):
         with multiprocessing.Manager() as m:
             lock = m.Lock()
             with ProcessPoolExecutor(
-                max_workers=10,
+                max_workers=self.max_workers,
                 # mp_context=ForkContext(),
                 mp_context=SpawnContext(),
             ) as pool:
