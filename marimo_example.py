@@ -14,7 +14,7 @@ def _():
     from example.catalog import Catalog
     from example.pipeline import heightmap_pipe, plot_heightmap
 
-    from pond import State
+    from pond import State, pipe, index_files
     from pond.catalogs.iceberg_catalog import IcebergCatalog
     from pond.hooks.marimo_progress_bar_hook import MarimoProgressBarHook
     from pond.hooks.ui_hook import UIHook
@@ -29,8 +29,10 @@ def _():
         State,
         UIHook,
         heightmap_pipe,
+        index_files,
         load_volume_protocol_args,
         mo,
+        pipe,
         plot_heightmap,
     )
 
@@ -58,7 +60,9 @@ def _(
     State,
     UIHook,
     heightmap_pipe,
+    index_files,
     load_volume_protocol_args,
+    pipe,
     res,
     vis,
 ):
@@ -70,7 +74,14 @@ def _(
     if vis.value:
         hooks.append(UIHook(1, "nils", "pond"))
     state["params.res"] = float(res.value)
-    pipeline = heightmap_pipe()
+    pipeline = pipe(
+        [
+            index_files(Catalog, "cloud_files"),
+            heightmap_pipe(),
+        ],
+        input="params",
+        output=["heightmap_plot", "bounds"],
+    )
     runner.run(state, pipeline, hooks)
     return (state,)
 

@@ -104,3 +104,17 @@ class AbstractHook(ABC):
             Called for every transform, even when they fail.
         """
         pass
+
+    def is_cancellation_requested(self) -> bool:
+        """Check if pipeline cancellation has been requested.
+
+        Returns:
+            False by default. Override in hooks that support cancellation.
+
+        Note:
+            This method provides a default implementation that allows runners
+            to check cancellation on any hook without needing to verify if
+            the method exists. Hooks that support cancellation should override
+            this method to return their actual cancellation state.
+        """
+        return False

@@ -6,7 +6,7 @@ import pyarrow as pa
 import pyarrow.compute as pc
 
 from example.catalog import Bounds, Catalog, Point
-from pond import index_files, node, pipe
+from pond import node, pipe
 from pond.transforms.transform_pipe import TransformPipe
 
 
@@ -92,28 +92,16 @@ def plot_heightmap(res: float, heightmap: np.ndarray, bounds: Bounds) -> go.Figu
     return fig
 
 
-def preprocessing() -> TransformPipe:
-    return pipe(
-        [
-            index_files(Catalog, "cloud_files"),
-            parse_clouds,
-        ],
-        output="clouds[:].points",
-    )
-
-
 def heightmap_pipe() -> TransformPipe:
     return pipe(
         [
-            preprocessing(),
-            # index_files(Catalog, "cloud_files"),
-            # parse_clouds,
+            parse_clouds,
             compute_cloud_bounds,
             compute_bounds,
             compute_cloud_heightmap,
             compute_heightmap,
             plot_heightmap,
         ],
-        input="params",
-        output="heightmap_plot",
+        input=["cloud_files", "params"],
+        output=["heightmap_plot", "bounds"],
     )

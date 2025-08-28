@@ -71,7 +71,7 @@ class File(BaseModel, Generic[DataT]):
             This method assumes the 'object' extra field was set via set() method.
             For lazy-loaded files, use load() instead.
         """
-        return self.object  # type: ignore
+        return self.object if hasattr(self, "object") else self.load()  # type: ignore
 
     def load(self) -> DataT:
         """Load data using the stored loader function.
@@ -87,7 +87,11 @@ class File(BaseModel, Generic[DataT]):
             This method assumes the 'loader' extra field was set via save() method.
             The loader function is expected to take no arguments and return DataT.
         """
-        return self.loader()  # type: ignore
+        self.object = self.loader()
+        return self.object  # type: ignore
+
+    def __eq__(self, other) -> bool:
+        return self.get() == other.get()
 
 
 def Field(

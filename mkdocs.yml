@@ -1,0 +1,174 @@
+site_name: PyPond Documentation
+site_description: A Python library for building data pipelines with hierarchical pydantic structures and arrow format storage
+site_url: https://pond.dev
+repo_url: https://github.com/nilsbore/pypond
+repo_name: nilsbore/pypond
+
+theme:
+  name: material
+  logo: assets/pypond-header-icon.svg
+  favicon: assets/pypond-header-icon.svg
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - content.code.copy
+    - content.code.select
+    - content.tabs.link
+    - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - toc.follow
+
+plugins:
+  - search:
+      separator: '[\s\u200b\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            docstring_options:
+              ignore_init_summary: true
+            merge_init_into_class: true
+            show_submodules: false
+            show_source: false
+            show_root_heading: true
+            show_root_toc_entry: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            signature_crossrefs: true
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      normalize_issue_symbols: true
+      repo_url_shorthand: true
+      user: nilsbore
+      repo: pypond
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      auto_append:
+        - includes/mkdocs.md
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+nav:
+  - Home: index.md
+  - User Guide:
+    - user-guide/index.md
+    - Getting Started: user-guide/getting-started.md
+    - Core Concepts: user-guide/core-concepts.md
+    - Working with Catalogs: user-guide/catalogs.md
+    - Building Transforms: user-guide/transforms.md
+    - Pipeline Execution: user-guide/execution.md
+    - File Handling: user-guide/files.md
+    - Advanced Usage: user-guide/advanced.md
+  - API Reference:
+    - api-reference/index.md
+    - Core:
+      - Decorators: api-reference/core/decorators.md
+      - Field: api-reference/core/field.md
+      - State: api-reference/core/state.md
+      - Lens: api-reference/core/lens.md
+      - Volume: api-reference/core/volume.md
+    - Catalogs:
+      - Abstract Catalog: api-reference/catalogs/abstract.md
+      - Iceberg Catalog: api-reference/catalogs/iceberg.md
+      - Lance Catalog: api-reference/catalogs/lance.md
+      - Delta Catalog: api-reference/catalogs/delta.md
+    - Transforms:
+      - Abstract Transform: api-reference/transforms/abstract.md
+      - Transform: api-reference/transforms/transform.md
+      - Transform List: api-reference/transforms/transform-list.md
+      - Transform List Fold: api-reference/transforms/transform-list-fold.md
+      - Transform Pipe: api-reference/transforms/transform-pipe.md
+    - Runners:
+      - Abstract Runner: api-reference/runners/abstract.md
+      - Sequential Runner: api-reference/runners/sequential.md
+      - Parallel Runner: api-reference/runners/parallel.md
+    - I/O:
+      - Readers: api-reference/io/readers.md
+      - Writers: api-reference/io/writers.md
+    - Hooks:
+      - Abstract Hook: api-reference/hooks/abstract.md
+      - UI Hook: api-reference/hooks/ui.md
+      - Marimo Progress Bar Hook: api-reference/hooks/marimo-progress.md
+  - Examples:
+    - examples/index.md
+    - Basic Pipeline: examples/basic-pipeline.md
+    - Data Processing: examples/data-processing.md
+    - File Operations: examples/file-operations.md
+  - Development:
+    - development/index.md
+    - Contributing: development/contributing.md
+    - Testing: development/testing.md
+
+watch:
+  - pond/
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/nilsbore/pypond
+  generator: false
+
+copyright: Copyright &copy; 2025 Nils Bore

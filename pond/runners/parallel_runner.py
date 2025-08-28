@@ -48,6 +48,7 @@ class ParallelRunner(AbstractRunner):
     Execution Strategy:
     - Analyzes transform dependencies based on input/output paths
     - Schedules transforms for parallel execution when dependencies are met
+    - FastAPI transforms are executed on the main thread to avoid serialization issues
     - Uses multiprocessing with spawn context for process isolation
     - Employs locks for thread-safe catalog commits
 
@@ -59,12 +60,53 @@ class ParallelRunner(AbstractRunner):
 
     Note:
         Uses spawn context for better cross-platform compatibility.
-        Maximum worker count is currently hardcoded to 10.
+        Worker count is configurable via max_workers parameter.
     """
 
-    def __init__(self):
-        """Initialize a parallel runner."""
+    def __init__(self, max_workers: int = 10):
+        """Initialize a parallel runner.
+
+        Args:
+            max_workers: Maximum number of worker processes to use. Defaults to 10.
+                        Set to 0 to use sequential execution (useful for debugging
+                        or testing environments where multiprocessing conflicts occur).
+        """
         super().__init__()
+        self.max_workers = max_workers
+
+    def _is_fastapi_transform(self, transform) -> bool:
+        """Conservative check for FastAPI transforms that can't be pickled."""
+        return "FastAPI" in transform.__class__.__name__
+
+    def _execute_on_main_thread(self, transform, state, hooks, lock):
+        """Execute FastAPI transform on main thread with proper error handling."""
+        error = None
+        success = True
+
+        try:
+            for hook in hooks:
+                hook.pre_node_execute(transform)
+
+            execute_units = transform.get_execute_units(state)
+
+            for unit in execute_units:
+                args = unit.load_inputs(state)
+                rtns = unit.run(args)
+                values = unit.save_outputs(state, rtns)
+
+                with lock:
+                    unit.commit(state, values)
+
+        except Exception as e:
+            error = e
+            success = False
+            for hook in hooks:
+                hook.post_node_execute(transform, success, error)
+            raise RuntimeError(f"Failed at transform {transform.get_name()}") from error
+
+        # Mark transform as completed
+        for hook in hooks:
+            hook.post_node_execute(transform, success, error)
 
     def run(self, state: State, pipe: TransformPipe, hooks: list[AbstractHook]):
         """Execute the pipeline in parallel with dependency resolution.
@@ -81,7 +123,16 @@ class ParallelRunner(AbstractRunner):
             Uses ProcessPoolExecutor with spawn context for process isolation.
             Transforms are scheduled as soon as their dependencies are satisfied.
             Catalog commits are synchronized using multiprocessing locks.
+            When max_workers=0, falls back to sequential execution to avoid
+            multiprocessing overhead and potential testing conflicts.
         """
+        # Special case: if max_workers=0, use sequential execution
+        if self.max_workers == 0:
+            from pond.runners.sequential_runner import SequentialRunner
+
+            sequential_runner = SequentialRunner()
+            return sequential_runner.run(state, pipe, hooks)
+
         # Initialize hooks and pipeline state
         for hook in hooks:
             hook.initialize(state.root_type)
@@ -103,11 +154,18 @@ class ParallelRunner(AbstractRunner):
         with multiprocessing.Manager() as m:
             lock = m.Lock()
             with ProcessPoolExecutor(
-                max_workers=10,
+                max_workers=self.max_workers,
                 # mp_context=ForkContext(),
                 mp_context=SpawnContext(),
             ) as pool:
                 while True:
+                    # Check for cancellation before scheduling new transforms
+                    if any(hook.is_cancellation_requested() for hook in hooks):
+                        # Cancel all pending futures
+                        for future in futures:
+                            future.cancel()
+                        raise InterruptedError("Pipeline execution was canceled")
+
                     ready = {
                         t
                         for t in todo
@@ -118,7 +176,21 @@ class ParallelRunner(AbstractRunner):
                     }
                     logger.info(f"Found {len(ready)} nodes to execute")
                     todo -= ready
+
+                    # Split ready transforms into parallel and FastAPI transforms
+                    parallel_ready = []
+                    fastapi_ready = []
+
                     for t in ready:
+                        transform = transforms[t]
+                        is_fastapi = self._is_fastapi_transform(transform)
+                        if is_fastapi:
+                            fastapi_ready.append(t)
+                        else:
+                            parallel_ready.append(t)
+
+                    # Submit ALL parallel transforms first
+                    for t in parallel_ready:
                         transform = transforms[t]
                         for hook in hooks:
                             hook.pre_node_execute(transform)
@@ -135,13 +207,40 @@ class ParallelRunner(AbstractRunner):
                                 )
                             )
 
-                    if not futures:
-                        logger.info("No futures left in pool, stopping...")
+                    # Then execute FastAPI transforms on main thread
+                    for t in fastapi_ready:
+                        transform = transforms[t]
+                        self._execute_on_main_thread(transform, state, hooks, lock)
+                        # Immediately add outputs to produced since execution is complete
+                        for o in transform.get_outputs():
+                            produced.append(o)
+
+                    # Check if we're done - no more todos and no pending futures
+                    if not todo and not futures:
+                        logger.info("All transforms completed, stopping...")
                         break
 
-                    done, futures = wait(
-                        futures, return_when=FIRST_COMPLETED, timeout=0.1
-                    )
+                    # If we just executed FastAPI transforms, continue to check for newly ready transforms
+                    if fastapi_ready and not futures:
+                        continue
+
+                    if not futures and todo:
+                        # This shouldn't happen - we have remaining work but no futures
+                        # This could indicate a dependency issue
+                        logger.warning(
+                            f"No futures but {len(todo)} transforms remaining"
+                        )
+                        break
+
+                    # Only wait for futures if we have any
+                    if futures:
+                        done, futures = wait(
+                            futures, return_when=FIRST_COMPLETED, timeout=0.1
+                        )
+                    else:
+                        # No futures to wait for, continue to check for more ready transforms
+                        done = set()
+                        continue
 
                     for future in done:
                         try:

@@ -52,6 +52,10 @@ class SequentialRunner(AbstractRunner):
         success = True
         # Execute each transform sequentially
         for transform in pipe.get_transforms():
+            # Check for cancellation before each transform
+            if any(hook.is_cancellation_requested() for hook in hooks):
+                raise InterruptedError("Pipeline execution was canceled")
+
             for hook in hooks:
                 hook.pre_node_execute(transform)
             try:

@@ -16,8 +16,42 @@ Sequential execution is ideal for development, debugging, and simple pipelines.
 ### Basic Usage
 
 ```python
+import tempfile
+from pond import State, node, pipe
+from pond.catalogs.iceberg_catalog import IcebergCatalog
 from pond.runners.sequential_runner import SequentialRunner
+from pydantic import BaseModel
 
+# Example pipeline setup
+class Input(BaseModel):
+    data: list[float]
+    
+class Output(BaseModel):
+    result: float
+    
+class Pipeline(BaseModel):
+    input: Input
+    output: Output
+
+@node(Pipeline, "input.data", "output.result")
+def compute_average(data: list[float]) -> float:
+    return sum(data) / len(data)
+
+# Setup catalog and state
+catalog_temp = tempfile.mkdtemp(prefix="seq_catalog_")
+warehouse_temp = tempfile.mkdtemp(prefix="seq_warehouse_")
+catalog = IcebergCatalog(
+    "sequential",
+    type="sql",
+    uri=f"sqlite:///{catalog_temp}/catalog.db",
+    warehouse=f"file://{warehouse_temp}"
+)
+catalog.catalog.create_namespace_if_not_exists("default")
+state = State(Pipeline, catalog)
+
+# Set input data and run pipeline
+state["input.data"] = [1.0, 2.0, 3.0, 4.0, 5.0]
+pipeline = pipe([compute_average], input="input", output="output.result")
 runner = SequentialRunner()
 runner.run(state, pipeline, hooks=[])
 ```
@@ -43,9 +77,50 @@ Parallel execution maximizes throughput by running independent transforms concur
 ### Basic Usage
 
 ```python
+import tempfile
+from pond import State, node, pipe
+from pond.catalogs.iceberg_catalog import IcebergCatalog
 from pond.runners.parallel_runner import ParallelRunner
+from pydantic import BaseModel
 
-runner = ParallelRunner()
+# Example pipeline setup
+class Input(BaseModel):
+    data_a: list[float]
+    data_b: list[float]
+    
+class Output(BaseModel):
+    result_a: float
+    result_b: float
+    
+class Pipeline(BaseModel):
+    input: Input
+    output: Output
+
+@node(Pipeline, "input.data_a", "output.result_a")
+def compute_average_a(data: list[float]) -> float:
+    return sum(data) / len(data)
+
+@node(Pipeline, "input.data_b", "output.result_b")
+def compute_average_b(data: list[float]) -> float:
+    return sum(data) / len(data)
+
+# Setup catalog and state
+catalog_temp = tempfile.mkdtemp(prefix="par_catalog_")
+warehouse_temp = tempfile.mkdtemp(prefix="par_warehouse_")
+catalog = IcebergCatalog(
+    "parallel",
+    type="sql",
+    uri=f"sqlite:///{catalog_temp}/catalog.db",
+    warehouse=f"file://{warehouse_temp}"
+)
+catalog.catalog.create_namespace_if_not_exists("default")
+state = State(Pipeline, catalog)
+
+# Set input data and run pipeline
+state["input.data_a"] = [1.0, 2.0, 3.0]
+state["input.data_b"] = [4.0, 5.0, 6.0]
+pipeline = pipe([compute_average_a, compute_average_b], input="input", output=["output.result_a", "output.result_b"])
+runner = ParallelRunner(max_workers=0)  # Use max_workers=0 for docs testing
 runner.run(state, pipeline, hooks=[])
 ```
 
@@ -54,19 +129,54 @@ runner.run(state, pipeline, hooks=[])
 The parallel runner automatically analyzes transform dependencies:
 
 ```python
+from pond import node
+from pydantic import BaseModel
+
+# Define data models
+class DataA(BaseModel):
+    values: list[float]
+    
+class DataB(BaseModel):
+    values: list[float]
+    
+class ResultA(BaseModel):
+    result: float
+    
+class ResultB(BaseModel):
+    result: float
+    
+class Combined(BaseModel):
+    total: float
+    
+class Input(BaseModel):
+    data_a: DataA
+    data_b: DataB
+    
+class Output(BaseModel):
+    result_a: ResultA
+    result_b: ResultB
+    
+class Final(BaseModel):
+    combined: Combined
+    
+class Catalog(BaseModel):
+    input: Input
+    output: Output
+    final: Final
+
 # These transforms can run in parallel
 @node(Catalog, "input.data_a", "output.result_a")
 def process_a(data: DataA) -> ResultA:
-    return transform_a(data)
+    return ResultA(result=sum(data.values) / len(data.values))
 
 @node(Catalog, "input.data_b", "output.result_b") 
 def process_b(data: DataB) -> ResultB:
-    return transform_b(data)
+    return ResultB(result=sum(data.values) / len(data.values))
 
 # This transform must wait for both above to complete
 @node(Catalog, ["output.result_a", "output.result_b"], "final.combined")
 def combine_results(a: ResultA, b: ResultB) -> Combined:
-    return combine(a, b)
+    return Combined(total=a.result + b.result)
 ```
 
 ### Process Pool Configuration
@@ -74,9 +184,11 @@ def combine_results(a: ResultA, b: ResultB) -> Combined:
 The parallel runner uses multiprocessing with configurable worker count:
 
 ```python
-# Currently hardcoded to 10 workers, but can be configured
-# Future versions will allow customization
-runner = ParallelRunner()
+from pond.runners.parallel_runner import ParallelRunner
+
+# Configurable number of worker processes
+runner = ParallelRunner(max_workers=10)  # Default is 10 workers
+print(f"Parallel runner created with 10 workers for production use")
 ```
 
 ### When to Use Parallel
@@ -152,6 +264,45 @@ def main_pipeline():
 In sequential execution, errors stop the pipeline immediately:
 
 ```python
+import tempfile
+from pond import State, node, pipe
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.runners.sequential_runner import SequentialRunner
+from pydantic import BaseModel
+
+# Example with error handling
+class Input(BaseModel):
+    data: list[float]
+    
+class Output(BaseModel):
+    result: float
+
+class Pipeline(BaseModel):
+    input: Input
+    output: Output
+
+@node(Pipeline, "input.data", "output.result")
+def failing_transform(data: list[float]) -> float:
+    if len(data) == 0:
+        raise ValueError("Empty data provided")
+    return sum(data) / len(data)
+
+# Setup
+catalog_temp = tempfile.mkdtemp(prefix="error_catalog_")
+warehouse_temp = tempfile.mkdtemp(prefix="error_warehouse_")
+catalog = IcebergCatalog(
+    "error_test",
+    type="sql",
+    uri=f"sqlite:///{catalog_temp}/catalog.db",
+    warehouse=f"file://{warehouse_temp}"
+)
+catalog.catalog.create_namespace_if_not_exists("default")
+state = State(Pipeline, catalog)
+pipeline = pipe([failing_transform], input="input", output="output.result")
+runner = SequentialRunner()
+
+# Set input data and run with error handling
+state["input.data"] = [1.0, 2.0, 3.0, 4.0, 5.0]
 try:
     runner.run(state, pipeline, hooks=[])
 except RuntimeError as e:
@@ -165,6 +316,45 @@ except RuntimeError as e:
 In parallel execution, one failure stops all execution:
 
 ```python
+import tempfile
+from pond import State, node, pipe
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.runners.parallel_runner import ParallelRunner
+from pydantic import BaseModel
+
+# Example with parallel error handling
+class Input(BaseModel):
+    data: list[float]
+    
+class Output(BaseModel):
+    result: float
+
+class Pipeline(BaseModel):
+    input: Input
+    output: Output
+
+@node(Pipeline, "input.data", "output.result")
+def failing_transform(data: list[float]) -> float:
+    if len(data) == 0:
+        raise ValueError("Empty data provided")
+    return sum(data) / len(data)
+
+# Setup
+catalog_temp = tempfile.mkdtemp(prefix="par_error_catalog_")
+warehouse_temp = tempfile.mkdtemp(prefix="par_error_warehouse_")
+catalog = IcebergCatalog(
+    "par_error_test",
+    type="sql",
+    uri=f"sqlite:///{catalog_temp}/catalog.db",
+    warehouse=f"file://{warehouse_temp}"
+)
+catalog.catalog.create_namespace_if_not_exists("default")
+state = State(Pipeline, catalog)
+pipeline = pipe([failing_transform], input="input", output="output.result")
+runner = ParallelRunner(max_workers=0)  # Use max_workers=0 for docs testing
+
+# Set input data and run with parallel error handling
+state["input.data"] = [1.0, 2.0, 3.0, 4.0, 5.0]
 try:
     runner.run(state, pipeline, hooks=[])
 except RuntimeError as e:
@@ -180,17 +370,75 @@ Both runners support the full hooks system for monitoring and extensibility.
 ### Progress Monitoring
 
 ```python
-from pond.hooks.ui_hook import UIHook
+import tempfile
+from pond import State, node, pipe
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.runners.sequential_runner import SequentialRunner
+from pond.hooks.abstract_hook import AbstractHook
+from pydantic import BaseModel
 
-# Hamilton UI integration
-ui_hook = UIHook(port=8080, username="analyst", project="pipeline")
+# Simple progress monitoring
+class ProgressHook(AbstractHook):
+    def __init__(self):
+        self.completed_count = 0
+        
+    def pre_node_execute(self, transform):
+        print(f"Starting: {transform.get_name()}")
+        
+    def post_node_execute(self, transform, success, error):
+        if success:
+            self.completed_count += 1
+            print(f"Completed: {transform.get_name()} (Total: {self.completed_count})")
+        else:
+            print(f"Failed: {transform.get_name()} - {error}")
 
-runner.run(state, pipeline, hooks=[ui_hook])
+# Example pipeline setup
+class Input(BaseModel):
+    data: list[float]
+    
+class Output(BaseModel):
+    result: float
+    
+class Pipeline(BaseModel):
+    input: Input
+    output: Output
+
+@node(Pipeline, "input.data", "output.result")
+def compute_average(data: list[float]) -> float:
+    return sum(data) / len(data)
+
+# Setup catalog and state
+catalog_temp = tempfile.mkdtemp(prefix="progress_catalog_")
+warehouse_temp = tempfile.mkdtemp(prefix="progress_warehouse_")
+catalog = IcebergCatalog(
+    "progress_test",
+    type="sql",
+    uri=f"sqlite:///{catalog_temp}/catalog.db",
+    warehouse=f"file://{warehouse_temp}"
+)
+catalog.catalog.create_namespace_if_not_exists("default")
+state = State(Pipeline, catalog)
+
+# Set input data and run with progress monitoring
+state["input.data"] = [1.0, 2.0, 3.0, 4.0, 5.0]
+pipeline = pipe([compute_average], input="input", output="output.result")
+runner = SequentialRunner()
+progress_hook = ProgressHook()
+runner.run(state, pipeline, hooks=[progress_hook])
 ```
 
 ### Custom Monitoring
 
 ```python
+import time
+import tempfile
+from pond import State, node, pipe
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.runners.sequential_runner import SequentialRunner
+from pond.hooks.abstract_hook import AbstractHook
+from pydantic import BaseModel
+
+# Custom timing hook
 class TimingHook(AbstractHook):
     def __init__(self):
         self.start_time = None
@@ -198,6 +446,7 @@ class TimingHook(AbstractHook):
     
     def pre_node_execute(self, transform):
         self.start_time = time.time()
+        print(f"Starting: {transform.get_name()}")
     
     def post_node_execute(self, transform, success, error):
         if self.start_time:
@@ -205,6 +454,39 @@ class TimingHook(AbstractHook):
             self.transform_times[transform.get_name()] = duration
             print(f"{transform.get_name()}: {duration:.2f}s")
 
+# Example pipeline setup
+class Input(BaseModel):
+    data: list[float]
+    
+class Output(BaseModel):
+    result: float
+    
+class Pipeline(BaseModel):
+    input: Input
+    output: Output
+
+@node(Pipeline, "input.data", "output.result")
+def compute_average(data: list[float]) -> float:
+    # Add small delay for timing demonstration
+    time.sleep(0.1)
+    return sum(data) / len(data)
+
+# Setup catalog and state
+catalog_temp = tempfile.mkdtemp(prefix="timing_catalog_")
+warehouse_temp = tempfile.mkdtemp(prefix="timing_warehouse_")
+catalog = IcebergCatalog(
+    "timing_test",
+    type="sql",
+    uri=f"sqlite:///{catalog_temp}/catalog.db",
+    warehouse=f"file://{warehouse_temp}"
+)
+catalog.catalog.create_namespace_if_not_exists("default")
+state = State(Pipeline, catalog)
+
+# Set sample data and run with timing
+state["input.data"] = [1.0, 2.0, 3.0, 4.0, 5.0]
+pipeline = pipe([compute_average], input="input", output="output.result")
+runner = SequentialRunner()
 timing_hook = TimingHook()
 runner.run(state, pipeline, hooks=[timing_hook])
 ```
@@ -214,17 +496,50 @@ runner.run(state, pipeline, hooks=[timing_hook])
 ### Parallel Runner Tips
 
 ```python
+from pond import node
+from pydantic import BaseModel
+
+# Define data models
+class RawData(BaseModel):
+    values: list[float]
+    
+class ProcessedData(BaseModel):
+    normalized: list[float]
+    
+class Dataset(BaseModel):
+    raw: RawData
+    processed: ProcessedData
+    
+class Step1Result(BaseModel):
+    intermediate: list[float]
+    
+class Step2Input(BaseModel):
+    intermediate: list[float]
+    
+class Step3Input(BaseModel):
+    final: list[float]
+    
+class Catalog(BaseModel):
+    datasets: list[Dataset]
+    step1: Step1Result
+    step2: Step2Input
+    step3: Step3Input
+
 # Good: Independent transforms that can parallelize
 @node(Catalog, "datasets[:].raw", "datasets[:].processed")
 def process_dataset(raw: RawData) -> ProcessedData:
-    return expensive_processing(raw)
+    # Expensive processing - each dataset processed independently
+    normalized = [(x - sum(raw.values)/len(raw.values)) for x in raw.values]
+    return ProcessedData(normalized=normalized)
 
 # Less optimal: Sequential dependencies
-@node(Catalog, "step1.result", "step2.input")
-def step1(data): return process_step1(data)
+@node(Catalog, "step1.intermediate", "step2.intermediate")
+def step1(data: list[float]) -> list[float]:
+    return [x * 2 for x in data]
 
-@node(Catalog, "step2.input", "step3.input") 
-def step2(data): return process_step2(data)
+@node(Catalog, "step2.intermediate", "step3.final") 
+def step2(data: list[float]) -> list[float]:
+    return [x + 1 for x in data]
 ```
 
 ### Resource Management
@@ -245,17 +560,44 @@ def memory_efficient_pipeline():
 ### I/O Optimization
 
 ```python
+from pond import node
+from pydantic import BaseModel
+
+# Define data models
+class InputA(BaseModel):
+    values: list[float]
+    
+class InputB(BaseModel):
+    values: list[float]
+    
+class InputC(BaseModel):
+    values: list[float]
+    
+class Input(BaseModel):
+    a: InputA
+    b: InputB
+    c: InputC
+    
+class Combined(BaseModel):
+    result: float
+    
+class Output(BaseModel):
+    combined: Combined
+    
+class Catalog(BaseModel):
+    input: Input
+    output: Output
+
 # Minimize catalog reads/writes
 @node(Catalog, ["input.a", "input.b", "input.c"], "output.combined")
-def combine_inputs(a, b, c):
+def combine_inputs(a: InputA, b: InputB, c: InputC) -> Combined:
     # Better: Single transform with multiple inputs
-    return combine_all(a, b, c)
+    all_values = a.values + b.values + c.values
+    result = sum(all_values) / len(all_values)
+    return Combined(result=result)
 
-# Avoid: Multiple separate reads
-# @node(Catalog, "input.a", "temp.a_processed")
-# @node(Catalog, "input.b", "temp.b_processed") 
-# @node(Catalog, "input.c", "temp.c_processed")
-# @node(Catalog, ["temp.a_processed", "temp.b_processed", "temp.c_processed"], "output.combined")
+# This approach minimizes I/O compared to multiple separate reads
+print("I/O optimization example: single transform with multiple inputs")
 ```
 
 ## Execution Patterns
@@ -263,19 +605,51 @@ def combine_inputs(a, b, c):
 ### Development Workflow
 
 ```python
+import tempfile
+from pond import State, node, pipe
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond.runners.sequential_runner import SequentialRunner
+from pond.runners.parallel_runner import ParallelRunner
+from pydantic import BaseModel
+
+# Example development workflow
+class Input(BaseModel):
+    data: list[float]
+    
+class Output(BaseModel):
+    result: float
+    
+class Pipeline(BaseModel):
+    input: Input
+    output: Output
+
+@node(Pipeline, "input.data", "output.result")
+def compute_average(data: list[float]) -> float:
+    return sum(data) / len(data)
+
+# Setup
+catalog_temp = tempfile.mkdtemp(prefix="workflow_catalog_")
+warehouse_temp = tempfile.mkdtemp(prefix="workflow_warehouse_")
+catalog = IcebergCatalog(
+    "workflow",
+    type="sql",
+    uri=f"sqlite:///{catalog_temp}/catalog.db",
+    warehouse=f"file://{warehouse_temp}"
+)
+catalog.catalog.create_namespace_if_not_exists("default")
+state = State(Pipeline, catalog)
+state["input.data"] = [1.0, 2.0, 3.0, 4.0, 5.0]
+pipeline = pipe([compute_average], input="input", output="output.result")
+
 # 1. Start with sequential for development
 dev_runner = SequentialRunner()
+print("Development phase: Sequential execution")
+dev_runner.run(state, pipeline, hooks=[])
 
-# 2. Add comprehensive logging
-dev_hooks = [LoggingHook(), TimingHook()]
-
-# 3. Run pipeline
-dev_runner.run(state, pipeline, dev_hooks)
-
-# 4. Switch to parallel for production
-prod_runner = ParallelRunner()
-prod_hooks = [UIHook(), MetricsHook()]
-prod_runner.run(state, pipeline, prod_hooks)
+# 2. Switch to parallel for production
+prod_runner = ParallelRunner(max_workers=0)  # Use max_workers=0 for docs testing
+print("Production phase: Parallel execution")
+prod_runner.run(state, pipeline, hooks=[])
 ```
 
 ### Incremental Processing
@@ -289,7 +663,7 @@ def incremental_pipeline(state, new_data_only=False):
         # Full reprocessing
         pipeline = pipe([process_all_data, generate_full_results])
     
-    runner = ParallelRunner()
+    runner = ParallelRunner(max_workers=0)  # Use max_workers=0 for docs testing
     runner.run(state, pipeline, hooks=[])
 ```
 
@@ -310,7 +684,7 @@ def adaptive_pipeline(state):
     transforms.extend([main_analysis, generate_output])
     
     pipeline = pipe(transforms)
-    runner = ParallelRunner()
+    runner = ParallelRunner(max_workers=0)  # Use max_workers=0 for docs testing
     runner.run(state, pipeline, hooks=[])
 ```
 

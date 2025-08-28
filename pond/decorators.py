@@ -1,7 +1,10 @@
 from typing import Callable, Type
 
+from fastapi import FastAPI
 from pydantic import BaseModel
 
+from pond.api.input_transform import FastAPIInputTransform
+from pond.api.output_transform import FastAPIOutputTransform
 from pond.transforms.abstract_transform import (
     AbstractExecuteTransform,
     AbstractTransform,
@@ -254,3 +257,61 @@ def index_files(
         File instances that can be processed by subsequent transforms.
     """
     return TransformIndex(Catalog, path, root_path)
+
+
+def fastapi_input(
+    Catalog: Type[BaseModel], input: list[str] | str, app: FastAPI
+) -> FastAPIInputTransform:
+    """Create a transform that waits for HTTP inputs to populate state paths.
+
+    Registers POST endpoints on the provided FastAPI app for setting state values.
+    The transform blocks execution until all specified input paths have been
+    populated via HTTP requests. URLs are automatically derived from path strings.
+
+    Args:
+        Catalog: Pydantic model class defining the data schema structure.
+        input: Input path(s) to expose as HTTP endpoints. Can be a single path
+            string or list of paths. Supports array notation like "clouds[:].points".
+        app: FastAPI application instance to register endpoints on.
+
+    Returns:
+        FastAPIInputTransform that waits for HTTP inputs.
+
+    Note:
+        URLs are automatically generated from paths:
+        - "params" → POST /input/params
+        - "clouds[0].points" → POST /input/clouds/0/points
+        - File[DataT] fields support multipart form uploads
+        - Regular fields accept JSON payloads
+    """
+    input_paths = [input] if isinstance(input, str) else input
+    return FastAPIInputTransform(Catalog, input_paths, app)
+
+
+def fastapi_output(
+    Catalog: Type[BaseModel], output: list[str] | str, app: FastAPI
+) -> FastAPIOutputTransform:
+    """Create a transform that exposes state paths as HTTP endpoints.
+
+    Registers GET endpoints on the provided FastAPI app for retrieving state values.
+    The transform runs after pipeline computation to serve results via HTTP.
+    URLs are automatically derived from path strings.
+
+    Args:
+        Catalog: Pydantic model class defining the data schema structure.
+        output: Output path(s) to expose as HTTP endpoints. Can be a single path
+            string or list of paths. Supports array notation like "clouds[:].bounds".
+        app: FastAPI application instance to register endpoints on.
+
+    Returns:
+        FastAPIOutputTransform that exposes outputs via HTTP endpoints.
+
+    Note:
+        URLs are automatically generated from paths:
+        - "heightmap_plot" → GET /output/heightmap_plot
+        - "clouds[0].bounds" → GET /output/clouds/0/bounds
+        - File[DataT] fields return file downloads
+        - Regular fields return JSON responses
+    """
+    output_paths = [output] if isinstance(output, str) else output
+    return FastAPIOutputTransform(Catalog, output_paths, app)
