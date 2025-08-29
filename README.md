@@ -1,4 +1,4 @@
-# PyPond
+# Pond
 
 <div align="center">
   <img src="docs/assets/pypond-icon.svg" alt="PyPond" width="256" height="256">
@@ -14,7 +14,7 @@
 
 </div>
 
-PyPond is a Python library for building data pipelines using hierarchical pydantic structures and arrow format storage. It provides a flexible and powerful framework for processing structured data with type safety and efficient storage backends.
+Pond is a Python library for building data pipelines using hierarchical pydantic structures and arrow format storage. It provides a flexible and powerful framework for processing structured data with type safety and efficient storage backends.
 
 ## ✨ Key Features
 
@@ -131,9 +131,9 @@ uv run python example.py --ui
 
 ## 📚 Documentation
 
-- **[User Guide](docs/user-guide/index.md)**: Learn how to use PyPond effectively
-- **[API Reference](docs/api-reference/index.md)**: Detailed documentation of all classes and functions
-- **[Examples](docs/examples/index.md)**: Practical examples and tutorials
+- **[Main docs page](https://pond-org.github.io/pond/)**: Entry point to documentation
+- **[User Guide](https://pond-org.github.io/pond/user-guide/)**: Learn how to use PyPond effectively
+- **[API Reference](https://pond-org.github.io/pond/api-reference/)**: Detailed documentation of all classes and functions
 
 ## 🤝 Contributing
 
@@ -154,3 +154,4 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## 🌟 Acknowledgments
 
 PyPond developers ❤️ the concepts behind [Kedro](https://github.com/kedro-org/kedro), particularly the data catalog approach. PyPond modernizes these ideas with arrow-native storage, pydantic schemas, and flexible execution models.
+
