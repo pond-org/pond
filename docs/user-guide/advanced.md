@@ -141,7 +141,7 @@ def parallel_analysis_pipeline():
 
 ### Dynamic Path Construction
 
-Build paths programmatically:
+Build paths programmatically for processing collections of data:
 
 ```python
 def process_experiment_results(experiment_id: str, trial_count: int):
@@ -207,7 +207,7 @@ def cross_catalog_analysis():
 
 ### Advanced Lens Operations
 
-Use lenses for complex data manipulation:
+Use lenses for sophisticated data access and manipulation patterns:
 
 ```python
 import tempfile
@@ -281,7 +281,7 @@ def advanced_lens_operations(state: State):
 
 ### Memory-Efficient Processing
 
-Handle large datasets with streaming patterns:
+Process large datasets efficiently with chunked operations:
 
 ```python
 import tempfile
@@ -315,7 +315,7 @@ class Catalog(BaseModel):
 
 @node(Catalog, "table:large_dataset", "summary.statistics")
 def streaming_analysis(table: pa.Table) -> dict:
-    # Process data in chunks to manage memory
+    # Efficiently process large Arrow tables in memory-managed chunks
     chunk_size = 10000
     total_rows = len(table)
     
