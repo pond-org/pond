@@ -6,7 +6,8 @@
 
 <div align="center">
 
-[![Test and lint](https://github.com/nilsbore/pypond/actions/workflows/tests.yml/badge.svg)](https://github.com/nilsbore/pypond/actions/workflows/tests.yml)
+[![Tests](https://github.com/nilsbore/pypond/actions/workflows/tests.yml/badge.svg)](https://github.com/nilsbore/pypond/actions/workflows/tests.yml)
+[![Docs](https://github.com/pond-org/pond/actions/workflows/docs.yml/badge.svg)](https://github.com/pond-org/pond/actions/workflows/docs.yml)
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Pydantic v2](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/pydantic/pydantic/main/docs/badge/v2.json)](https://docs.pydantic.dev/latest/contributing/#badges)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
@@ -154,4 +155,5 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## 🌟 Acknowledgments
 
 PyPond developers ❤️ the concepts behind [Kedro](https://github.com/kedro-org/kedro), particularly the data catalog approach. PyPond modernizes these ideas with arrow-native storage, pydantic schemas, and flexible execution models.
+
 
