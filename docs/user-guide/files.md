@@ -392,7 +392,7 @@ def process_image(image: np.ndarray) -> np.ndarray:
 ## File Indexing
 
 ### Automatic File Discovery
-Index existing files into the catalog:
+Discover and register existing files in your data catalog using the `index_files` function:
 
 ```python
 import tempfile
@@ -424,7 +424,7 @@ index_files(Catalog, "datasets[:].data_files")
 ```
 
 ### File Patterns
-Use wildcards to match multiple files:
+Use custom paths to specify file locations and patterns:
 
 ```python
 from pydantic import BaseModel

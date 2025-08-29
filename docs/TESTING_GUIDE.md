@@ -211,6 +211,49 @@ uv run python -m pytest docs --codeblocks -v
 uv run python -m pytest docs/user-guide/getting-started.md -v
 ```
 
+## Current Implementation Notes
+
+### Self-Contained Code Blocks (Current Status)
+
+Currently, most documentation examples are self-contained with their own setup code. This was done to fix immediate testing issues, but the conftest approach above is preferred for future documentation.
+
+**Common Patterns in Current Docs:**
+
+```python
+# Current pattern - will be refactored to use conftest functions later
+import tempfile
+from pond.catalogs.iceberg_catalog import IcebergCatalog
+from pond import State
+
+temp_dir = tempfile.mkdtemp(prefix="pypond_example_")
+catalog = IcebergCatalog(
+    "example_name",
+    type="sql",
+    uri=f"sqlite:///{temp_dir}/catalog.db",
+    warehouse=f"file://{temp_dir}",
+)
+catalog.catalog.create_namespace_if_not_exists("catalog")
+
+# IMPORTANT: File operations need volume protocol args
+volume_protocol_args = {"dir": {"path": temp_dir}}
+state = State(Catalog, catalog, volume_protocol_args=volume_protocol_args)
+```
+
+### Key Lessons from Recent Fixes
+
+1. **Volume Protocol Args**: File operations require `volume_protocol_args = {"dir": {"path": warehouse_dir}}` in State initialization
+2. **Unique Identifiers**: Use unique catalog names and temp directory prefixes to avoid conflicts
+3. **PyPond Limitations**: Only one wildcard supported in paths (e.g., `datasets[:].files[:]` won't work)
+4. **Complete Setup**: IcebergCatalog needs both `uri` and `warehouse` parameters
+
+### Future Refactoring Plan
+
+The current self-contained examples should be refactored to use conftest functions that handle:
+- Proper catalog configuration with URI and warehouse
+- Volume protocol args setup
+- Unique naming to avoid test conflicts
+- Cleanup after tests
+
 ## Troubleshooting
 
 ### Import Errors
@@ -219,9 +262,21 @@ If you get import errors for conftest:
 - Make sure the sys.path.append lines are correct
 - Check that you're importing from the right location
 
+### Volume Protocol Errors
+
+If you get `KeyError: 'dir'` when working with files:
+- Ensure `volume_protocol_args = {"dir": {"path": temp_dir}}` is passed to State
+- This is required for any file operations (`state["file:path"]` assignments)
+
 ### Catalog Errors
 
 Don't try to fix catalog setup in your documentation - fix it in `docs/conftest.py` and use the shared function.
+
+### Wildcard Path Errors
+
+If you get "Only one wildcard currently supported":
+- PyPond currently supports only one `[:]` wildcard per path
+- Use loops instead: `for i in range(n): state[f"items[{i}].files[:]"]`
 
 ## Contributing
 
