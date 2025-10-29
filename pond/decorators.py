@@ -16,6 +16,10 @@ from typing import Callable, Type
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from pond.agents.abstract_agent import AbstractAgent
+from pond.agents.agent import Agent
+from pond.agents.agent_list import AgentList
+from pond.agents.agent_list_fold import AgentListFold
 from pond.api.input_transform import FastAPIInputTransform
 from pond.api.output_transform import FastAPIOutputTransform
 from pond.transforms.abstract_transform import (
@@ -328,3 +332,178 @@ def fastapi_output(
     """
     output_paths = [output] if isinstance(output, str) else output
     return FastAPIOutputTransform(Catalog, output_paths, app)
+
+
+class agent_node:
+    """Decorator class for creating LLM-powered agent transformation nodes.
+
+    An agent node uses pydantic-ai to perform data transformations using
+    Large Language Models (LLMs) instead of user-defined functions. Automatically
+    selects the appropriate agent type based on input/output patterns.
+
+    Agent Type Selection Rules:
+    - Agent: Scalar input/output (e.g., input="query", output="response")
+    - AgentList: Array input AND array output (e.g., input="reviews[:].text", output="reviews[:].sentiment")
+    - AgentListFold: Array input, scalar output (e.g., input="reviews[:].text", output="overall_summary")
+
+    Examples:
+        # Basic agent - processes single values
+        @agent_node(
+            Catalog,
+            "customer_query",
+            "support_response",
+            model="anthropic:claude-sonnet-4-0",
+            instructions="Provide helpful customer support responses."
+        )
+
+        # List agent - processes each array element independently
+        @agent_node(
+            Catalog,
+            "reviews[:].text",
+            "reviews[:].sentiment",
+            model="openai:gpt-4o",
+            instructions="Analyze sentiment of the review."
+        )
+
+        # List fold agent - aggregates array elements to single value
+        @agent_node(
+            Catalog,
+            "reviews[:].text",
+            "overall_summary",
+            model="anthropic:claude-sonnet-4-0",
+            instructions="Summarize all reviews into a cohesive summary."
+        )
+
+    Attributes:
+        Catalog: The pydantic model class defining the data structure schema.
+        input: Input path(s) as string or list of strings. Supports array notation.
+        output: Output path(s) as string or list of strings.
+        model: Model identifier (e.g., "openai:gpt-4o", "anthropic:claude-sonnet-4-0").
+        instructions: System prompt/instructions for the agent.
+        prompt: Optional user prompt template.
+        input_descriptions: Optional descriptions for input fields.
+        output_descriptions: Optional descriptions for output fields.
+
+    Note:
+        The decorator analyzes input/output patterns to choose between Agent,
+        AgentList, or AgentListFold implementations automatically.
+    """
+
+    def __init__(
+        self,
+        Catalog: Type[BaseModel],
+        input: list[str] | str,
+        output: list[str] | str,
+        model: str,
+        instructions: str,
+        prompt: str | None = None,
+        input_descriptions: list[str] | None = None,
+        output_descriptions: list[str] | None = None,
+    ):
+        """Initialize an agent_node decorator.
+
+        Args:
+            Catalog: Pydantic model class defining the data schema structure.
+            input: Input data path(s). Can be a single path or list of paths.
+                Supports array wildcard notation "[:] ".
+            output: Output data path(s). Can be a single path or list of paths.
+            model: Model identifier (e.g., "openai:gpt-4o",
+                "anthropic:claude-sonnet-4-0", "google-gla:gemini-1.5-flash").
+            instructions: System prompt/instructions that guide the agent's behavior.
+            prompt: Optional user prompt template. If not provided, structured
+                input will be used as the prompt.
+            input_descriptions: Optional list of descriptions for each input field,
+                helps the LLM understand the inputs.
+            output_descriptions: Optional list of descriptions for each output field,
+                guides the LLM's structured output generation.
+
+        Note:
+            Path strings use dot notation (e.g., "data.field[0].subfield").
+            Array wildcards "[:] " enable collection processing agents.
+        """
+        self.Catalog = Catalog
+        self.input = input
+        self.output = output
+        self.model = model
+        self.instructions = instructions
+        self.prompt = prompt
+        self.input_descriptions = input_descriptions
+        self.output_descriptions = output_descriptions
+
+    def __call__(self) -> AbstractAgent:
+        """Create an agent node based on input/output path patterns.
+
+        Analyzes the input/output path patterns to automatically select
+        the appropriate agent implementation.
+
+        Agent Selection Logic:
+        1. Checks for "[:] " wildcard in input paths → list_input = True
+        2. Checks for "[:] " wildcard in output paths → list_output = True
+        3. Selects agent type:
+           - list_input=True + list_output=True → AgentList
+           - list_input=True + list_output=False → AgentListFold
+           - list_input=False + list_output=False → Agent
+           - list_input=False + list_output=True → RuntimeError (unsupported)
+
+        Returns:
+            An AbstractAgent instance of the appropriate type:
+            - Agent: For scalar input/output
+            - AgentList: For array input and array output
+            - AgentListFold: For array input and scalar output
+
+        Raises:
+            RuntimeError: If output paths use "[:] " notation without corresponding
+                array inputs, which is not supported.
+
+        Note:
+            The agent automatically builds Pydantic types based on catalog schema
+            types at the specified input/output paths.
+        """
+        inputs = self.input if isinstance(self.input, list) else [self.input]
+        outputs = self.output if isinstance(self.output, list) else [self.output]
+        list_input = False
+        list_output = False
+        for input in inputs:
+            if "[:]" in input:
+                list_input = True
+                break
+        for output in outputs:
+            if "[:]" in output:
+                list_output = True
+                break
+
+        if list_input and list_output:
+            return AgentList(
+                self.Catalog,
+                self.input,
+                self.output,
+                self.model,
+                self.instructions,
+                self.prompt,
+                self.input_descriptions,
+                self.output_descriptions,
+            )
+        elif list_input:
+            return AgentListFold(
+                self.Catalog,
+                self.input,
+                self.output,
+                self.model,
+                self.instructions,
+                self.prompt,
+                self.input_descriptions,
+                self.output_descriptions,
+            )
+        elif list_output:
+            raise RuntimeError("Outputs can not use [:] indices without any in input")
+        else:
+            return Agent(
+                self.Catalog,
+                self.input,
+                self.output,
+                self.model,
+                self.instructions,
+                self.prompt,
+                self.input_descriptions,
+                self.output_descriptions,
+            )
