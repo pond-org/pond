@@ -142,15 +142,6 @@ class AgentListFold(AbstractAgent):
             output_types, output_names, output_descriptions
         )
 
-        # Create pydantic-ai agent
-        from pydantic_ai import Agent as PydanticAgent
-
-        self.agent = PydanticAgent(
-            model,
-            output_type=self.output_type,
-            system_prompt=instructions,
-        )
-
         # Store names for later use
         self.input_names = input_names
         self.output_names = output_names
@@ -171,13 +162,16 @@ class AgentListFold(AbstractAgent):
         """
         return self.instructions
 
-    def get_fn(self) -> "PydanticAgent":  # type: ignore # noqa: F821
-        """Get the underlying pydantic-ai agent.
+    def get_fn(self) -> str:
+        """Get the model identifier for this agent.
 
         Returns:
-            The PydanticAgent instance.
+            The model identifier string.
+
+        Note:
+            Returns model identifier instead of agent instance for serialization.
         """
-        return self.agent
+        return self.model
 
     def get_model(self) -> str:
         """Get the model identifier for this agent.
@@ -249,7 +243,8 @@ class AgentListFold(AbstractAgent):
             ExecuteAgent(
                 inputs=[i.lens_path.clone() for i in self.input_lenses.values()],
                 outputs=[o.lens_path for o in self.output_lenses.values()],
-                agent=self.agent,
+                model=self.model,
+                instructions=self.instructions,
                 input_type=self.input_type,
                 output_type=self.output_type,
                 input_names=self.input_names,

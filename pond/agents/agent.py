@@ -20,7 +20,6 @@ from collections import OrderedDict
 from typing import Type
 
 from pydantic import BaseModel
-from pydantic_ai import Agent as PydanticAgent
 
 from pond.agents.abstract_agent import AbstractAgent, ExecuteAgent
 from pond.agents.type_builder import build_input_type, build_output_type
@@ -125,13 +124,6 @@ class Agent(AbstractAgent):
             output_types, output_names, output_descriptions
         )
 
-        # Create pydantic-ai agent
-        self.agent = PydanticAgent(
-            model,
-            output_type=self.output_type,
-            system_prompt=instructions,
-        )
-
         # Store names for later use
         self.input_names = input_names
         self.output_names = output_names
@@ -152,13 +144,16 @@ class Agent(AbstractAgent):
         """
         return self.instructions
 
-    def get_fn(self) -> PydanticAgent:
-        """Get the underlying pydantic-ai agent.
+    def get_fn(self) -> str:
+        """Get the model identifier for this agent.
 
         Returns:
-            The PydanticAgent instance.
+            The model identifier string.
+
+        Note:
+            Returns model identifier instead of agent instance for serialization.
         """
-        return self.agent
+        return self.model
 
     def get_model(self) -> str:
         """Get the model identifier for this agent.
@@ -224,7 +219,8 @@ class Agent(AbstractAgent):
             ExecuteAgent(
                 inputs=self.get_inputs(),
                 outputs=self.get_outputs(),
-                agent=self.agent,
+                model=self.model,
+                instructions=self.instructions,
                 input_type=self.input_type,
                 output_type=self.output_type,
                 input_names=self.input_names,

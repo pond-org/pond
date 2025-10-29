@@ -6,17 +6,34 @@ LLM-powered data transformations using pydantic-ai as an alternative to function
 
 The agents module extends pond's transform system with Large Language Model (LLM) capabilities through pydantic-ai. Agents provide the same input/output mapping patterns as transforms but use LLMs instead of user-defined functions.
 
+## Quick Start
+
+Use the `agent()` function to create LLM-powered transforms:
+
+```python
+from pond.decorators import agent
+
+# Automatically selects the right agent type based on input/output patterns
+analyze_sentiment = agent(
+    Catalog,
+    "review.text",
+    "review.sentiment",
+    model="openai:gpt-4o",
+    instructions="Analyze sentiment: return Positive, Negative, or Neutral."
+)
+```
+
 ## Agent Types
+
+The `agent()` function automatically selects the appropriate type based on your input/output paths:
 
 ### 1. Agent (Scalar → Scalar)
 
-Processes single values to produce single outputs.
+**When**: Neither input nor output paths contain `[:]`
 
+**Example**:
 ```python
-from pond.agents.agent import Agent
-
-# Generate a product description from features
-generate_description = Agent(
+generate_description = agent(
     Catalog,
     "product.features",
     "product.description",
@@ -27,13 +44,11 @@ generate_description = Agent(
 
 ### 2. AgentList (Array → Array)
 
-Processes array elements independently, one-to-one mapping.
+**When**: Both input and output paths contain `[:]`
 
+**Example**:
 ```python
-from pond.agents.agent_list import AgentList
-
-# Analyze sentiment for each review
-analyze_sentiments = AgentList(
+analyze_sentiments = agent(
     Catalog,
     "reviews[:].text",
     "reviews[:].sentiment",
@@ -44,34 +59,16 @@ analyze_sentiments = AgentList(
 
 ### 3. AgentListFold (Array → Scalar)
 
-Aggregates array elements into a single output.
+**When**: Input paths contain `[:]` but output paths don't
 
+**Example**:
 ```python
-from pond.agents.agent_list_fold import AgentListFold
-
-# Summarize all reviews
-summarize_reviews = AgentListFold(
+summarize_reviews = agent(
     Catalog,
     "reviews[:].text",
     "overall_summary",
     model="anthropic:claude-sonnet-4-0",
     instructions="Summarize all reviews into a cohesive 2-3 sentence summary.",
-)
-```
-
-## Decorator Syntax (Optional)
-
-You can also use the `@agent_node` decorator:
-
-```python
-from pond.decorators import agent_node
-
-@agent_node(
-    Catalog,
-    "customer_query",
-    "support_response",
-    model="openai:gpt-4o",
-    instructions="Provide helpful customer support responses."
 )
 ```
 
@@ -104,44 +101,41 @@ export GEMINI_API_KEY="your-key"
 
 ### Agent Parameters
 
-- **Catalog** (`Type[BaseModel]`): Your catalog schema
-- **input** (`str | list[str]`): Input path(s) in the catalog
-- **output** (`str | list[str]`): Output path(s) in the catalog
-- **model** (`str`): Model identifier (e.g., "openai:gpt-4o")
-- **instructions** (`str`): System prompt guiding agent behavior
-- **prompt** (`str | None`): Optional user prompt template
-- **input_descriptions** (`list[str] | None`): Descriptions for input fields
-- **output_descriptions** (`list[str] | None`): Descriptions for output fields
-
-## Dynamic Type Building
-
-Agents automatically build Pydantic types from catalog schemas:
-
 ```python
-# Input: catalog.customer_query (str)
-# Agent builds: class AgentInput(BaseModel): customer_query: str
-
-# Output: catalog.support_response (str)
-# Agent builds: class AgentOutput(BaseModel): support_response: str
+agent(
+    Catalog,              # Your catalog schema
+    input,                # str | list[str] - Input path(s)
+    output,               # str | list[str] - Output path(s)
+    model,                # str - Model identifier
+    instructions,         # str - System prompt
+    prompt=None,          # Optional user prompt template
+    input_descriptions=None,   # Optional field descriptions
+    output_descriptions=None,  # Optional field descriptions
+)
 ```
-
-The LLM receives structured inputs and produces validated structured outputs based on catalog types.
 
 ## Pipeline Integration
 
 Agents work seamlessly with pond pipelines:
 
 ```python
-from pond.decorators import pipe, construct
+from pond.decorators import agent, pipe, construct
 from pond.runners.sequential_runner import SequentialRunner
 
+# Create agents
+analyze = agent(Catalog, "reviews[:].text", "reviews[:].sentiment", ...)
+summarize = agent(Catalog, "reviews[:].text", "overall_summary", ...)
+recommend = agent(Catalog, "overall_summary", "recommendation", ...)
+
+# Build pipeline
 pipeline = pipe([
     construct(Catalog),
-    analyze_sentiments,    # AgentList
-    summarize_reviews,     # AgentListFold
-    generate_report,       # Agent
-], output="report")
+    analyze,
+    summarize,
+    recommend,
+], output="recommendation")
 
+# Run
 runner = SequentialRunner()
 runner.run(state, pipeline)
 ```
@@ -152,7 +146,7 @@ Agents support multiple inputs and outputs:
 
 ```python
 # Multiple inputs
-multi_input_agent = Agent(
+multi_input_agent = agent(
     Catalog,
     ["product.name", "product.price", "product.features"],
     "product.marketing_copy",
@@ -161,7 +155,7 @@ multi_input_agent = Agent(
 )
 
 # Multiple outputs
-multi_output_agent = Agent(
+multi_output_agent = agent(
     Catalog,
     "customer_feedback",
     ["analysis.sentiment", "analysis.priority"],
@@ -189,7 +183,7 @@ instructions="Look at the text and tell me what you think."
 Use descriptions to guide the LLM:
 
 ```python
-Agent(
+agent(
     Catalog,
     "reviews[:].text",
     "reviews[:].sentiment",
@@ -220,40 +214,25 @@ Pydantic-ai automatically retries if LLM output doesn't match the schema:
 The agents module mirrors the transforms architecture:
 
 ```
-AbstractAgent (base class)
-├── Agent (scalar → scalar)
-├── AgentList (array → array)
-└── AgentListFold (array → scalar)
+agent() function
+    ↓ (auto-selects based on paths)
+    ├── Agent (scalar → scalar)
+    ├── AgentList (array → array)
+    └── AgentListFold (array → scalar)
 
 ExecuteAgent (execution unit)
 ├── load_inputs() - Load from catalog
-├── run() - Execute pydantic-ai agent
+├── run() - Execute pydantic-ai agent (created lazily)
 ├── save_outputs() - Convert to Arrow tables
 └── commit() - Write to catalog
 ```
 
-## Type Builder Utilities
+### Lazy Agent Instantiation
 
-For advanced use cases, use the type builder directly:
-
-```python
-from pond.agents.type_builder import (
-    build_input_type,
-    build_output_type,
-    extract_field_value,
-)
-
-# Build custom types
-InputType = build_input_type(
-    [str, int],
-    ["name", "age"],
-    ["User name", "User age"]
-)
-
-# Extract values from agent output
-result = agent.run_sync("query")
-value = extract_field_value(result.output, "field_name")
-```
+The pydantic-ai Agent is created lazily in `ExecuteAgent` to support:
+- **Process parallelization**: Proper serialization for multiprocessing
+- **Resource efficiency**: Only create agents when needed
+- **Thread safety**: Each process gets its own agent instance
 
 ## Examples
 
@@ -276,6 +255,45 @@ See `examples/agent_example.py` for a complete working example demonstrating all
 2. **Cost**: Each agent execution incurs API costs
 3. **Reliability**: LLMs may produce inconsistent outputs
 4. **Offline**: Requires internet connectivity (except local models)
+
+## Advanced Usage
+
+### Dynamic Type Building
+
+Agents automatically build Pydantic types from catalog schemas:
+
+```python
+# Input: catalog.customer_query (str)
+# Agent builds: class AgentInput(BaseModel): customer_query: str
+
+# Output: catalog.support_response (str)
+# Agent builds: class AgentOutput(BaseModel): support_response: str
+```
+
+The LLM receives structured inputs and produces validated structured outputs based on catalog types.
+
+### Type Builder Utilities
+
+For advanced use cases, use the type builder directly:
+
+```python
+from pond.agents.type_builder import (
+    build_input_type,
+    build_output_type,
+    extract_field_value,
+)
+
+# Build custom types
+InputType = build_input_type(
+    [str, int],
+    ["name", "age"],
+    ["User name", "User age"]
+)
+
+# Extract values from agent output
+result = agent_run(...)
+value = extract_field_value(result.output, "field_name")
+```
 
 ## Future Enhancements
 

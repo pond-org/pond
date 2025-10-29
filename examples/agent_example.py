@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 """Example demonstrating pydantic-ai agent transforms in pond.
 
-This example shows how to use Agent, AgentList, and AgentListFold
-to perform LLM-powered data transformations in pipelines.
+This example shows how to use the agent() function to create
+LLM-powered data transformations in pipelines.
 """
 from pydantic import BaseModel
 
-from pond.agents.agent import Agent
-from pond.agents.agent_list import AgentList
-from pond.agents.agent_list_fold import AgentListFold
-from pond.decorators import agent_node, construct, pipe
+from pond.decorators import agent, construct, pipe
 from pond.runners.sequential_runner import SequentialRunner
 from pond.state import State
 
@@ -33,7 +30,7 @@ class ProductData(BaseModel):
 
 # Example 1: Agent (scalar -> scalar)
 # Generates a recommendation based on the overall summary
-generate_recommendation = Agent(
+generate_recommendation = agent(
     ProductData,
     "overall_summary",
     "recommendation",
@@ -43,7 +40,7 @@ generate_recommendation = Agent(
 
 # Example 2: AgentList (array -> array)
 # Analyzes sentiment for each review
-analyze_sentiments = AgentList(
+analyze_sentiments = agent(
     ProductData,
     "reviews[:].text",
     "reviews[:].sentiment",
@@ -54,7 +51,7 @@ analyze_sentiments = AgentList(
 
 # Example 3: AgentListFold (array -> scalar)
 # Aggregates all reviews into a single summary
-summarize_reviews = AgentListFold(
+summarize_reviews = agent(
     ProductData,
     "reviews[:].text",
     "overall_summary",
@@ -64,15 +61,15 @@ summarize_reviews = AgentListFold(
     output_descriptions=["Overall summary of all reviews"],
 )
 
-# Example using decorator syntax (optional)
-@agent_node(
+# Example 4: Another agent (array -> array)
+# Converts sentiments to numeric ratings
+sentiment_to_rating = agent(
     ProductData,
     "reviews[:].sentiment",
     "reviews[:].rating",
     model="openai:gpt-4o-mini",
     instructions="Convert sentiment to a rating: Positive=5, Neutral=3, Negative=1.",
 )
-sentiment_to_rating = None  # The decorator creates the agent
 
 
 def main():

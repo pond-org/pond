@@ -226,7 +226,8 @@ class AgentList(Agent):
                 ExecuteAgent(
                     inputs=inputs,
                     outputs=outputs,
-                    agent=self.agent,
+                    model=self.model,
+                    instructions=self.instructions,
                     input_type=self.input_type,
                     output_type=self.output_type,
                     input_names=self.input_names,

@@ -40,24 +40,27 @@ class ExecuteAgent(AbstractExecuteUnit):
     created Pydantic models.
 
     Attributes:
-        agent: The pydantic-ai Agent instance.
+        model: Model identifier string.
+        instructions: System prompt for the agent.
         input_type: Pydantic model for structured agent input.
         output_type: Pydantic model for structured agent output.
         input_names: List of field names for the input model.
         output_names: List of field names for the output model.
         prompt: Optional user prompt to pass to the agent.
         append_outputs: List of output paths that should append rather than overwrite.
+        _agent: The pydantic-ai Agent instance (created lazily).
 
     Note:
-        Agents run synchronously using agent.run_sync(). For async execution,
-        pipeline runners should handle async/await orchestration.
+        The pydantic-ai Agent is instantiated on first use to support
+        process parallelization and proper serialization.
     """
 
     def __init__(
         self,
         inputs: list[LensPath],
         outputs: list[LensPath],
-        agent: Agent,
+        model: str,
+        instructions: str,
         input_type: Type[BaseModel],
         output_type: Type[BaseModel],
         input_names: list[str],
@@ -70,7 +73,8 @@ class ExecuteAgent(AbstractExecuteUnit):
         Args:
             inputs: List of input paths for data loading.
             outputs: List of output paths for data storage.
-            agent: The pydantic-ai Agent instance to execute.
+            model: Model identifier (e.g., "openai:gpt-4o").
+            instructions: System prompt/instructions for the agent.
             input_type: Pydantic model class for structured input.
             output_type: Pydantic model class for structured output.
             input_names: Field names in the input model.
@@ -79,16 +83,18 @@ class ExecuteAgent(AbstractExecuteUnit):
             append_outputs: Output paths that should append to existing data.
 
         Note:
-            The agent must be configured with the output_type as its result type.
+            The pydantic-ai Agent is not created here but on first use.
         """
         super().__init__(inputs, outputs)
-        self.agent = agent
+        self.model = model
+        self.instructions = instructions
         self.input_type = input_type
         self.output_type = output_type
         self.input_names = input_names
         self.output_names = output_names
         self.prompt = prompt
         self.append_outputs = append_outputs
+        self._agent = None  # Lazy initialization
 
     def __getstate__(self):
         """Prepare instance state for pickling using dill.
@@ -97,13 +103,15 @@ class ExecuteAgent(AbstractExecuteUnit):
             Serialized state containing all necessary attributes.
 
         Note:
-            Uses dill to handle serialization of the agent and types.
+            Uses dill to handle serialization. The agent instance is not
+            serialized - it will be recreated when needed.
         """
         return dill.dumps(
             (
                 self.inputs,
                 self.outputs,
-                self.agent,
+                self.model,
+                self.instructions,
                 self.input_type,
                 self.output_type,
                 self.input_names,
@@ -122,7 +130,8 @@ class ExecuteAgent(AbstractExecuteUnit):
         (
             self.inputs,
             self.outputs,
-            self.agent,
+            self.model,
+            self.instructions,
             self.input_type,
             self.output_type,
             self.input_names,
@@ -130,6 +139,25 @@ class ExecuteAgent(AbstractExecuteUnit):
             self.prompt,
             self.append_outputs,
         ) = dill.loads(state)
+        self._agent = None  # Will be created on first use
+
+    @property
+    def agent(self) -> Agent:
+        """Get or create the pydantic-ai Agent instance.
+
+        Returns:
+            The pydantic-ai Agent instance.
+
+        Note:
+            Lazy initialization allows proper serialization for multiprocessing.
+        """
+        if self._agent is None:
+            self._agent = Agent(
+                self.model,
+                output_type=self.output_type,
+                system_prompt=self.instructions,
+            )
+        return self._agent
 
     def load_inputs(self, state: State) -> list[Any]:
         """Load input data from the catalog, handling array wildcards.
