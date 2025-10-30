@@ -16,6 +16,10 @@ from typing import Callable, Type
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from pond.agents.abstract_agent import AbstractAgent
+from pond.agents.agent import Agent
+from pond.agents.agent_list import AgentList
+from pond.agents.agent_list_fold import AgentListFold
 from pond.api.input_transform import FastAPIInputTransform
 from pond.api.output_transform import FastAPIOutputTransform
 from pond.transforms.abstract_transform import (
@@ -328,3 +332,127 @@ def fastapi_output(
     """
     output_paths = [output] if isinstance(output, str) else output
     return FastAPIOutputTransform(Catalog, output_paths, app)
+
+
+def agent(
+    Catalog: Type[BaseModel],
+    input: list[str] | str,
+    output: list[str] | str,
+    model: str,
+    instructions: str,
+    prompt: str | None = None,
+    input_descriptions: list[str] | None = None,
+    output_descriptions: list[str] | None = None,
+) -> AbstractAgent:
+    """Create an LLM-powered agent transform.
+
+    Uses pydantic-ai to perform data transformations using Large Language Models
+    instead of user-defined functions. Automatically selects the appropriate agent
+    type based on input/output path patterns.
+
+    Agent Type Selection Rules:
+    - Agent: Scalar input/output (no [:] in paths)
+    - AgentList: Array input AND array output ([:] in both)
+    - AgentListFold: Array input, scalar output ([:] in input only)
+
+    Examples:
+        # Basic agent - processes single values
+        generate_description = agent(
+            Catalog,
+            "product.features",
+            "product.description",
+            model="anthropic:claude-sonnet-4-0",
+            instructions="Generate a compelling product description."
+        )
+
+        # List agent - processes each array element independently
+        analyze_sentiments = agent(
+            Catalog,
+            "reviews[:].text",
+            "reviews[:].sentiment",
+            model="openai:gpt-4o",
+            instructions="Analyze sentiment: Positive, Negative, or Neutral."
+        )
+
+        # List fold agent - aggregates array elements to single value
+        summarize_reviews = agent(
+            Catalog,
+            "reviews[:].text",
+            "overall_summary",
+            model="openai:gpt-4o",
+            instructions="Summarize all reviews into 2-3 sentences."
+        )
+
+    Args:
+        Catalog: Pydantic model class defining the data schema structure.
+        input: Input data path(s). Can be a single path or list of paths.
+            Supports array wildcard notation "[:] ".
+        output: Output data path(s). Can be a single path or list of paths.
+        model: Model identifier (e.g., "openai:gpt-4o",
+            "anthropic:claude-sonnet-4-0", "google-gla:gemini-1.5-flash").
+        instructions: System prompt/instructions that guide the agent's behavior.
+        prompt: Optional user prompt template. If not provided, structured
+            input will be converted to a prompt automatically.
+        input_descriptions: Optional list of descriptions for each input field,
+            helps the LLM understand the inputs.
+        output_descriptions: Optional list of descriptions for each output field,
+            guides the LLM's structured output generation.
+
+    Returns:
+        An AbstractAgent instance of the appropriate type:
+        - Agent: For scalar input/output
+        - AgentList: For array input and array output
+        - AgentListFold: For array input and scalar output
+
+    Raises:
+        RuntimeError: If output paths use "[:] " notation without corresponding
+            array inputs, which is not supported.
+
+    Note:
+        Path strings use dot notation (e.g., "data.field[0].subfield").
+        Array wildcards "[:] " enable collection processing.
+        The agent automatically builds Pydantic types based on catalog schemas.
+    """
+    inputs = input if isinstance(input, list) else [input]
+    outputs = output if isinstance(output, list) else [output]
+
+    # Analyze input/output patterns
+    list_input = any("[:]" in inp for inp in inputs)
+    list_output = any("[:]" in outp for outp in outputs)
+
+    # Select appropriate agent type
+    if list_input and list_output:
+        return AgentList(
+            Catalog,
+            input,
+            output,
+            model,
+            instructions,
+            prompt,
+            input_descriptions,
+            output_descriptions,
+        )
+    elif list_input:
+        return AgentListFold(
+            Catalog,
+            input,
+            output,
+            model,
+            instructions,
+            prompt,
+            input_descriptions,
+            output_descriptions,
+        )
+    elif list_output:
+        raise RuntimeError("Outputs cannot use [:] indices without any in input")
+    else:
+        return Agent(
+            Catalog,
+            input,
+            output,
+            model,
+            instructions,
+            prompt,
+            input_descriptions,
+            output_descriptions,
+        )

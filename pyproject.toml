@@ -19,6 +19,7 @@ dependencies = [
     "parse>=1.20.2",
     "pillow>=11.1.0",
     "plotly>=6.0.0",
+    "pydantic-ai>=0.0.14",
     "pydantic-to-pyarrow>=0.1.5",
     "pyiceberg[pyarrow,s3fs,sql-sqlite]>=0.8.1",
     "pytest>=8.3.4",

@@ -1,0 +1,321 @@
+# Copyright 2025 Nils Bore
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Abstract base classes for pydantic-ai agent transforms.
+
+This module provides the foundation for agent-based transforms that use
+pydantic-ai for LLM-powered data transformations. Agents parallel the
+transform system but use LLMs instead of user-defined functions.
+"""
+from abc import abstractmethod
+from typing import Any, Type
+
+import dill  # type: ignore
+from pydantic import BaseModel
+from pydantic_ai import Agent
+
+from pond.lens import LensPath
+from pond.state import State
+from pond.transforms.abstract_transform import (
+    AbstractExecuteTransform,
+    AbstractExecuteUnit,
+)
+
+
+class ExecuteAgent(AbstractExecuteUnit):
+    """Executable unit that runs a pydantic-ai agent.
+
+    Similar to ExecuteTransform but uses a pydantic-ai Agent instead of
+    a user function. Handles structured input/output via dynamically
+    created Pydantic models.
+
+    Attributes:
+        model: Model identifier string.
+        instructions: System prompt for the agent.
+        input_type: Pydantic model for structured agent input.
+        output_type: Pydantic model for structured agent output.
+        input_names: List of field names for the input model.
+        output_names: List of field names for the output model.
+        prompt: Optional user prompt to pass to the agent.
+        append_outputs: List of output paths that should append rather than overwrite.
+        _agent: The pydantic-ai Agent instance (created lazily).
+
+    Note:
+        The pydantic-ai Agent is instantiated on first use to support
+        process parallelization and proper serialization.
+    """
+
+    def __init__(
+        self,
+        inputs: list[LensPath],
+        outputs: list[LensPath],
+        model: str,
+        instructions: str,
+        input_type: Type[BaseModel],
+        output_type: Type[BaseModel],
+        input_names: list[str],
+        output_names: list[str],
+        prompt: str | None = None,
+        append_outputs: list[LensPath] = [],
+    ):
+        """Initialize an ExecuteAgent.
+
+        Args:
+            inputs: List of input paths for data loading.
+            outputs: List of output paths for data storage.
+            model: Model identifier (e.g., "openai:gpt-4o").
+            instructions: System prompt/instructions for the agent.
+            input_type: Pydantic model class for structured input.
+            output_type: Pydantic model class for structured output.
+            input_names: Field names in the input model.
+            output_names: Field names in the output model.
+            prompt: Optional user prompt to pass when running the agent.
+            append_outputs: Output paths that should append to existing data.
+
+        Note:
+            The pydantic-ai Agent is not created here but on first use.
+        """
+        super().__init__(inputs, outputs)
+        self.model = model
+        self.instructions = instructions
+        self.input_type = input_type
+        self.output_type = output_type
+        self.input_names = input_names
+        self.output_names = output_names
+        self.prompt = prompt
+        self.append_outputs = append_outputs
+        self._agent = None  # Lazy initialization
+        self._test_model = None  # For testing with TestModel override
+
+    def override_model(self, test_model):
+        """Override the model for testing purposes.
+
+        Args:
+            test_model: A pydantic-ai model (e.g., TestModel) to use instead
+                of the configured model.
+
+        Note:
+            This is primarily for testing with TestModel to avoid real API calls.
+        """
+        self._test_model = test_model
+
+    def __getstate__(self):
+        """Prepare instance state for pickling using dill.
+
+        Returns:
+            Serialized state containing all necessary attributes.
+
+        Note:
+            Uses dill to handle serialization. The agent instance is not
+            serialized - it will be recreated when needed.
+        """
+        return dill.dumps(
+            (
+                self.inputs,
+                self.outputs,
+                self.model,
+                self.instructions,
+                self.input_type,
+                self.output_type,
+                self.input_names,
+                self.output_names,
+                self.prompt,
+                self.append_outputs,
+            )
+        )
+
+    def __setstate__(self, state):
+        """Restore instance state after unpickling.
+
+        Args:
+            state: Serialized state from __getstate__.
+        """
+        (
+            self.inputs,
+            self.outputs,
+            self.model,
+            self.instructions,
+            self.input_type,
+            self.output_type,
+            self.input_names,
+            self.output_names,
+            self.prompt,
+            self.append_outputs,
+        ) = dill.loads(state)
+        self._agent = None  # Will be created on first use
+
+    @property
+    def agent(self) -> Agent:
+        """Get or create the pydantic-ai Agent instance.
+
+        Returns:
+            The pydantic-ai Agent instance.
+
+        Note:
+            Lazy initialization allows proper serialization for multiprocessing.
+            If a test model override is set, creates agent with that model.
+        """
+        if self._agent is None:
+            model = self._test_model if self._test_model is not None else self.model
+            self._agent = Agent(
+                model,
+                output_type=self.output_type,
+                system_prompt=self.instructions,
+            )
+        return self._agent
+
+    def load_inputs(self, state: State) -> list[Any]:
+        """Load input data from the catalog, handling array wildcards.
+
+        For inputs with wildcard indices (index == -1), attempts to load
+        the entire array first. If not available, iterates through indices
+        to build the array dynamically.
+
+        Args:
+            state: Pipeline state with catalog access.
+
+        Returns:
+            List of loaded input values, with arrays expanded as needed.
+
+        Note:
+            Uses the same wildcard expansion logic as ExecuteTransform.
+            For nested field access (e.g., reviews[:].text), always iterates
+            through indices to properly access the nested fields.
+        """
+        args = []
+        for i in self.inputs:
+            try:
+                index = next(ind for ind, v in enumerate(i.path) if v.index == -1)
+
+                # Check if there are more path components after the wildcard
+                # If so, we need to iterate to access nested fields
+                has_nested_access = index < len(i.path) - 1
+
+                if not has_nested_access:
+                    # No nested access - try loading the whole array first
+                    parent = LensPath(i.path[: index + 1])
+                    parent.path[-1].index = None
+                    value = state[parent.to_path()]
+                    if value is not None:
+                        args.append(value)
+                        continue
+
+                # Iterate through indices to load each element
+                input_list = []
+                for list_index in range(0, 100000):
+                    i.path[index].index = list_index
+                    try:
+                        value = state[i.to_path()]
+                        if value is None:
+                            break
+                        input_list.append(value)
+                    except (IndexError, KeyError):
+                        # No more elements in the array
+                        break
+                args.append(input_list)
+            except StopIteration:
+                args.append(state[i.to_path()])
+                continue
+        return args
+
+    def save_outputs(self, state: State, rtns: list[Any]) -> list[Any]:
+        """Convert output values to catalog-compatible Arrow tables.
+
+        Args:
+            state: Pipeline state with catalog access.
+            rtns: List of computed output values from the agent.
+
+        Returns:
+            List of Arrow tables ready for catalog storage.
+
+        Note:
+            Uses the lens system to convert Python objects to appropriate
+            Arrow table representations.
+        """
+        values = []
+        for rtn, o in zip(rtns, self.outputs):
+            values.append(state.lens(o.to_path()).create_table(rtn))
+        return values
+
+    def commit(self, state: State, values: list[Any]) -> bool:
+        """Commit Arrow tables to the catalog.
+
+        Args:
+            state: Pipeline state with catalog access.
+            values: List of Arrow tables from save_outputs.
+
+        Returns:
+            True if all commits were successful.
+
+        Note:
+            Respects append_outputs list to determine append vs. overwrite.
+        """
+        for val, o in zip(values, self.outputs):
+            append = o in self.append_outputs
+            state.lens(o.to_path()).write_table(val, append)
+        return True
+
+    def run(self, args: list[Any]) -> list[Any]:
+        """Execute the pydantic-ai agent with loaded arguments.
+
+        Creates a structured input instance from the arguments and runs
+        the agent. Extracts individual output field values from the
+        structured agent response.
+
+        Args:
+            args: List of arguments loaded by load_inputs.
+
+        Returns:
+            List of output values extracted from the agent response.
+
+        Note:
+            Uses run_sync for synchronous execution. The agent validates
+            its output against the output_type schema automatically.
+        """
+        # Create input instance
+        input_kwargs = dict(zip(self.input_names, args, strict=True))
+        input_instance = self.input_type(**input_kwargs)
+
+        # Run agent
+        if self.prompt:
+            result = self.agent.run_sync(self.prompt, deps=input_instance)
+        else:
+            # If no prompt, use input as the prompt (for simple cases)
+            prompt_str = str(input_instance)
+            result = self.agent.run_sync(prompt_str, deps=input_instance)
+
+        # Extract output values
+        output_values = [
+            getattr(result.output, field_name) for field_name in self.output_names
+        ]
+
+        return output_values
+
+
+class AbstractAgent(AbstractExecuteTransform):
+    """Abstract base class for agent-based transforms.
+
+    Extends AbstractExecuteTransform to support pydantic-ai agents.
+    Concrete implementations include Agent, AgentList, and AgentListFold.
+
+    Attributes:
+        model: Model identifier (e.g., "openai:gpt-4o", "anthropic:claude-sonnet-4-0").
+        instructions: System prompt/instructions for the agent.
+        prompt: Optional user prompt template.
+
+    Note:
+        Agents use dynamically built Pydantic types based on catalog schemas
+        to enable structured input/output for LLM interactions.
+    """
+    pass
+
