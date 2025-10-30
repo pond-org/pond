@@ -230,5 +230,176 @@ def test_agent_with_descriptions(tmp_path):
     assert result is not None
 
 
+def test_agent_list_format_inputs_outputs(tmp_path):
+    """Test Agent with list format for inputs and outputs."""
+    test_model = TestModel()
+
+    my_agent = agent(
+        AgentTestCatalog,
+        ["query"],  # List format
+        ["response"],  # List format
+        model="test",
+        instructions="Respond to the query.",
+    )
+
+    # Setup state
+    data_catalog = LanceCatalog(tmp_path)
+    state = State(AgentTestCatalog, data_catalog)
+
+    # Write input data
+    state.lens("query").write_table(state.lens("query").create_table("Test query"))
+
+    # Run agent
+    units = my_agent.get_execute_units(state)
+    for unit in units:
+        unit.override_model(test_model)
+        unit.execute_on(state)
+
+    # Verify output
+    result = state["response"]
+    assert result is not None
+    assert result != ""
+
+
+def test_agent_list_mixed_inputs(tmp_path):
+    """Test AgentList with mix of scalar and multiple array inputs."""
+    test_model = TestModel()
+
+    # Create a catalog with additional fields
+    class Product(BaseModel):
+        name: str
+        price: float = 0.0
+        description: str = ""
+
+    class MixedCatalog(BaseModel):
+        category: str = ""
+        products: list[Product] = []
+
+    mixed_agent = agent(
+        MixedCatalog,
+        ["category", "products[:].name", "products[:].price"],
+        "products[:].description",
+        model="test",
+        instructions="Generate product description based on category, name and price.",
+    )
+
+    # Setup state
+    data_catalog = LanceCatalog(tmp_path)
+    state = State(MixedCatalog, data_catalog)
+
+    # Write input data
+    state.lens("category").write_table(
+        state.lens("category").create_table("Electronics")
+    )
+    products_data = [
+        Product(name="Laptop", price=999.99),
+        Product(name="Mouse", price=29.99),
+    ]
+    state.lens("products").write_table(
+        state.lens("products").create_table(products_data)
+    )
+
+    # Run agent
+    units = mixed_agent.get_execute_units(state)
+    for unit in units:
+        unit.override_model(test_model)
+        unit.execute_on(state)
+
+    # Verify all products have descriptions
+    for i in range(len(products_data)):
+        description = state[f"products[{i}].description"]
+        assert description is not None
+        assert description != ""
+
+
+def test_agent_list_fold_partitioned(tmp_path):
+    """Test AgentListFold with partitioned array writes."""
+    test_model = TestModel()
+
+    aggregate_agent = agent(
+        AgentTestCatalog,
+        "reviews[:].text",
+        "analysis.overall_sentiment",
+        model="test",
+        instructions="Aggregate all reviews into overall sentiment.",
+    )
+
+    # Setup state
+    data_catalog = LanceCatalog(tmp_path)
+    state = State(AgentTestCatalog, data_catalog)
+
+    # Write reviews individually (partitioned)
+    state.lens("reviews[0]").write_table(
+        state.lens("reviews[0]").create_table(Review(text="Excellent!"))
+    )
+    state.lens("reviews[1]").write_table(
+        state.lens("reviews[1]").create_table(Review(text="Very good!"))
+    )
+    state.lens("reviews[2]").write_table(
+        state.lens("reviews[2]").create_table(Review(text="Fantastic!"))
+    )
+
+    # Initialize analysis object
+    state.lens("analysis").write_table(
+        state.lens("analysis").create_table(Analysis())
+    )
+
+    # Run agent
+    units = aggregate_agent.get_execute_units(state)
+    for unit in units:
+        unit.override_model(test_model)
+        unit.execute_on(state)
+
+    # Verify overall sentiment was set
+    result = state["analysis.overall_sentiment"]
+    assert result is not None
+    assert result != ""
+
+
+def test_agent_multiple_outputs(tmp_path):
+    """Test agent with multiple outputs."""
+    test_model = TestModel()
+
+    multi_output_agent = agent(
+        AgentTestCatalog,
+        "reviews[:].text",
+        ["analysis.overall_sentiment", "analysis.recommendation"],
+        model="test",
+        instructions="Analyze reviews and provide sentiment and recommendation.",
+    )
+
+    # Setup state
+    data_catalog = LanceCatalog(tmp_path)
+    state = State(AgentTestCatalog, data_catalog)
+
+    # Write input reviews
+    reviews_data = [
+        Review(text="Great!"),
+        Review(text="Love it!"),
+    ]
+    state.lens("reviews").write_table(
+        state.lens("reviews").create_table(reviews_data)
+    )
+
+    # Initialize analysis object
+    state.lens("analysis").write_table(
+        state.lens("analysis").create_table(Analysis())
+    )
+
+    # Run agent
+    units = multi_output_agent.get_execute_units(state)
+    for unit in units:
+        unit.override_model(test_model)
+        unit.execute_on(state)
+
+    # Verify both outputs were set
+    sentiment = state["analysis.overall_sentiment"]
+    recommendation = state["analysis.recommendation"]
+    assert sentiment is not None
+    assert sentiment != ""
+    assert recommendation is not None
+    assert recommendation != ""
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
