@@ -189,24 +189,39 @@ class ExecuteAgent(AbstractExecuteUnit):
 
         Note:
             Uses the same wildcard expansion logic as ExecuteTransform.
+            For nested field access (e.g., reviews[:].text), always iterates
+            through indices to properly access the nested fields.
         """
         args = []
         for i in self.inputs:
             try:
                 index = next(ind for ind, v in enumerate(i.path) if v.index == -1)
-                parent = LensPath(i.path[: index + 1])
-                parent.path[-1].index = None
-                value = state[parent.to_path()]
-                if value is not None:
-                    args.append(value)
-                    continue
+
+                # Check if there are more path components after the wildcard
+                # If so, we need to iterate to access nested fields
+                has_nested_access = index < len(i.path) - 1
+
+                if not has_nested_access:
+                    # No nested access - try loading the whole array first
+                    parent = LensPath(i.path[: index + 1])
+                    parent.path[-1].index = None
+                    value = state[parent.to_path()]
+                    if value is not None:
+                        args.append(value)
+                        continue
+
+                # Iterate through indices to load each element
                 input_list = []
                 for list_index in range(0, 100000):
                     i.path[index].index = list_index
-                    value = state[i.to_path()]
-                    if value is None:
+                    try:
+                        value = state[i.to_path()]
+                        if value is None:
+                            break
+                        input_list.append(value)
+                    except (IndexError, KeyError):
+                        # No more elements in the array
                         break
-                    input_list.append(value)
                 args.append(input_list)
             except StopIteration:
                 args.append(state[i.to_path()])

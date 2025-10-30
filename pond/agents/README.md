@@ -255,7 +255,6 @@ See `examples/agent_example.py` for a complete working example demonstrating all
 2. **Cost**: Each agent execution incurs API costs
 3. **Reliability**: LLMs may produce inconsistent outputs
 4. **Offline**: Requires internet connectivity (except local models)
-5. **Nested field access**: Currently, accessing nested fields within arrays (e.g., `reviews[:].text`) is not fully supported for AgentListFold. As a workaround, use whole objects (`reviews[:]`) or flatten the data first. This limitation is under investigation and requires catalog system enhancements.
 
 ## Advanced Usage
 

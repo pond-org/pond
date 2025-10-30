@@ -117,7 +117,6 @@ def test_agent_list_array_to_array(tmp_path):
         assert sentiment != ""
 
 
-@pytest.mark.skip(reason="Nested field access (reviews[:].text) not yet supported - requires catalog enhancement")
 def test_agent_list_fold_array_to_scalar(tmp_path):
     """Test AgentListFold (array -> scalar) with TestModel."""
     test_model = TestModel()
