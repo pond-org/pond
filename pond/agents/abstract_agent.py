@@ -95,6 +95,19 @@ class ExecuteAgent(AbstractExecuteUnit):
         self.prompt = prompt
         self.append_outputs = append_outputs
         self._agent = None  # Lazy initialization
+        self._test_model = None  # For testing with TestModel override
+
+    def override_model(self, test_model):
+        """Override the model for testing purposes.
+
+        Args:
+            test_model: A pydantic-ai model (e.g., TestModel) to use instead
+                of the configured model.
+
+        Note:
+            This is primarily for testing with TestModel to avoid real API calls.
+        """
+        self._test_model = test_model
 
     def __getstate__(self):
         """Prepare instance state for pickling using dill.
@@ -150,10 +163,12 @@ class ExecuteAgent(AbstractExecuteUnit):
 
         Note:
             Lazy initialization allows proper serialization for multiprocessing.
+            If a test model override is set, creates agent with that model.
         """
         if self._agent is None:
+            model = self._test_model if self._test_model is not None else self.model
             self._agent = Agent(
-                self.model,
+                model,
                 output_type=self.output_type,
                 system_prompt=self.instructions,
             )
