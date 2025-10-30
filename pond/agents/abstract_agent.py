@@ -287,30 +287,5 @@ class AbstractAgent(AbstractExecuteTransform):
         Agents use dynamically built Pydantic types based on catalog schemas
         to enable structured input/output for LLM interactions.
     """
+    pass
 
-    @abstractmethod
-    def get_model(self) -> str:
-        """Get the model identifier for this agent.
-
-        Returns:
-            Model string in format "provider:model-name".
-        """
-        pass
-
-    @abstractmethod
-    def get_instructions(self) -> str:
-        """Get the system instructions for this agent.
-
-        Returns:
-            System prompt that guides the agent's behavior.
-        """
-        pass
-
-    @abstractmethod
-    def get_prompt(self) -> str | None:
-        """Get the user prompt template for this agent.
-
-        Returns:
-            Optional user prompt string, or None for default behavior.
-        """
-        pass

@@ -173,30 +173,6 @@ class AgentListFold(AbstractAgent):
         """
         return self.model
 
-    def get_model(self) -> str:
-        """Get the model identifier for this agent.
-
-        Returns:
-            Model string (e.g., "openai:gpt-4o").
-        """
-        return self.model
-
-    def get_instructions(self) -> str:
-        """Get the system instructions for this agent.
-
-        Returns:
-            System prompt string.
-        """
-        return self.instructions
-
-    def get_prompt(self) -> str | None:
-        """Get the user prompt template for this agent.
-
-        Returns:
-            Optional user prompt string.
-        """
-        return self.prompt
-
     def get_inputs(self) -> list["LensPath"]:  # type: ignore # noqa: F821
         """Get the input paths for this agent.
 
